@@ -1,0 +1,6 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+  "mdb.connectionSaving.defaultConnectionSavingLocation": "Global",
+  "files.exclude": { "**/.env": true, "**/local-data": true },
+  "files.associations": { "**/mongo/*.js": "javascript" }
+}

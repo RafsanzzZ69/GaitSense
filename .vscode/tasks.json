@@ -1,0 +1,106 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "GaitSense Web: Start full local app",
+      "dependsOn": ["GaitSense Backend: API", "GaitSense Backend: Worker", "GaitSense Web: Frontend"],
+      "dependsOrder": "parallel", "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Web: Frontend", "type": "shell",
+      "command": "npm run web -- --port 8081",
+      "options": { "cwd": "${workspaceFolder}/frontend" }, "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Web: Test", "type": "shell",
+      "command": "npm test",
+      "options": { "cwd": "${workspaceFolder}/frontend" }, "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Backend: Start API and worker",
+      "dependsOn": ["GaitSense Backend: API", "GaitSense Backend: Worker"],
+      "dependsOrder": "parallel", "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Atlas: Save connection in VS Code", "type": "process",
+      "command": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+      "args": ["${workspaceFolder}/backend/scripts/connect-vscode.py"], "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Backend: Setup", "type": "shell",
+      "command": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/backend/scripts/run.ps1", "-Action", "Setup"], "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Backend: API", "type": "shell",
+      "command": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/backend/scripts/run.ps1", "-Action", "Api"], "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Backend: Worker", "type": "shell",
+      "command": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/backend/scripts/run.ps1", "-Action", "Worker"], "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Backend: Test (isolated MongoDB)", "type": "shell",
+      "command": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/backend/scripts/run.ps1", "-Action", "Test"], "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Backend: Check configured database", "type": "shell",
+      "command": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/backend/scripts/run.ps1", "-Action", "Check"], "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Backend: Backup and migrate configured database", "type": "shell",
+      "command": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/backend/scripts/run.ps1", "-Action", "Migrate"], "problemMatcher": []
+    },
+    {
+      "label": "GaitSense DB: Start",
+      "type": "shell",
+      "command": "node scripts/db-cli.mjs up",
+      "options": { "cwd": "${workspaceFolder}/database" },
+      "problemMatcher": []
+    },
+    {
+      "label": "GaitSense DB: Verify",
+      "type": "shell",
+      "command": "node scripts/db-cli.mjs verify",
+      "options": { "cwd": "${workspaceFolder}/database" },
+      "problemMatcher": []
+    },
+    {
+      "label": "GaitSense DB: Logs",
+      "type": "shell",
+      "command": "node scripts/db-cli.mjs logs",
+      "options": { "cwd": "${workspaceFolder}/database" },
+      "problemMatcher": []
+    },
+    {
+      "label": "GaitSense DB: Stop",
+      "type": "shell",
+      "command": "node scripts/db-cli.mjs down",
+      "options": { "cwd": "${workspaceFolder}/database" },
+      "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Android: Build offline APK", "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/frontend/scripts/android-build.ps1", "-Action", "assemble"],
+      "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Android: Verify APK privacy and assets", "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/frontend/scripts/verify-android-apk.ps1"],
+      "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Android: Install offline APK", "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/frontend/scripts/android-build.ps1", "-Action", "install"],
+      "problemMatcher": []
+    },
+    {
+      "label": "GaitSense Android: Native instrumentation tests", "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/frontend/scripts/android-build.ps1", "-Action", "test", "-Architectures", "x86_64"],
+      "problemMatcher": []
+    }
+  ]
+}

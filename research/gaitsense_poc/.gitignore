@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+output/
+videos/
+artifacts/pose_videos/
+reports/*.pkl

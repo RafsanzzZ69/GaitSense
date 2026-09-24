@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "mongodb.mongodb-vscode",
+    "dbaeumer.vscode-eslint",
+    "ms-python.python"
+  ]
+}

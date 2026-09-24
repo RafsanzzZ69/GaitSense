@@ -1,0 +1,21 @@
+{
+  "name": "gaitsense-database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable MongoDB schema, indexes, seed data, and verification for GaitSense",
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/static-check.mjs",
+    "db:up": "node scripts/db-cli.mjs up",
+    "db:down": "node scripts/db-cli.mjs down",
+    "db:status": "node scripts/db-cli.mjs status",
+    "db:logs": "node scripts/db-cli.mjs logs",
+    "db:migrate": "node scripts/db-cli.mjs migrate",
+    "db:verify": "node scripts/db-cli.mjs verify",
+    "db:reset": "node scripts/db-cli.mjs reset",
+    "atlas:setup": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup-atlas.ps1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

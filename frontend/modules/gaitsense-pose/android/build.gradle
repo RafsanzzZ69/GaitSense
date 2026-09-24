@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'expo.modules.gaitsensepose'
+version = '0.1.0'
+android {
+  namespace 'expo.modules.gaitsensepose'
+  defaultConfig {
+    minSdkVersion 26
+    versionCode 1
+    versionName '0.1.0'
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+  }
+  androidResources { noCompress += 'task' }
+}
+dependencies {
+  implementation 'com.google.mediapipe:tasks-vision:0.10.32'
+  androidTestImplementation 'androidx.test:runner:1.6.2'
+  androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}

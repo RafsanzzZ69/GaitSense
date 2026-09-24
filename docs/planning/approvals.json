@@ -1,0 +1,10 @@
+{
+  "protocol_version": "GS-SIDE-1.0-draft",
+  "approvals": [
+    {"id":"A-01","decision":"pending","reviewer":"","date":"","evidence_ref":"","topic":"Supervisor accepts offline scope and proposed Expo native spike versus prescribed Flutter"},
+    {"id":"A-02","decision":"pending","reviewer":"","date":"","evidence_ref":"","topic":"Institutional ethics approval or documented exemption"},
+    {"id":"A-03","decision":"pending","reviewer":"","date":"","evidence_ref":"","topic":"Protocol, sample-size rationale, endpoints, labels and acceptance thresholds"},
+    {"id":"A-04","decision":"pending","reviewer":"","date":"","evidence_ref":"","topic":"Participant information, consent, safety, retention and withdrawal"},
+    {"id":"A-05","decision":"pending","reviewer":"","date":"","evidence_ref":"","topic":"Named team members accept accountable roles and restricted access responsibilities"}
+  ]
+}

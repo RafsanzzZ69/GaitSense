@@ -1,0 +1,20 @@
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const source = resolve(root, '../research/gaitsense_poc/models/pose_landmarker_full.task');
+const target = resolve(root, 'modules/gaitsense-pose/android/src/main/assets/pose_landmarker_full.task');
+const hash = '5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1';
+let bytes;
+if (existsSync(source)) bytes=readFileSync(source);
+else if (existsSync(target)) bytes=readFileSync(target);
+else if (process.argv.includes('--download')) {
+  const response=await fetch('https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',{signal:AbortSignal.timeout(120000)});
+  if(!response.ok) throw new Error(`Official model download failed: ${response.status}`);
+  bytes=Buffer.from(await response.arrayBuffer());
+} else throw new Error('Missing model. Run node scripts/prepare-pose-model.mjs --download once while online, then build offline-capable APK.');
+if (createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('Model checksum mismatch; source was not copied.');
+mkdirSync(dirname(target), { recursive: true });
+writeFileSync(target, bytes);
+console.log('Bundled pose model verified and copied. No videos or credentials copied.');

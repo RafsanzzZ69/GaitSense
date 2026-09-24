@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GaitSense | Backend verification</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#e7eef1;background:#101c24}body{margin:0}main{max-width:1120px;margin:auto;padding:32px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:30px;margin:5px 0}h2{font-size:19px}p{color:#b6c7ce;line-height:1.6}.label{color:#64dfb6;font-size:13px;letter-spacing:2px}.pill{background:#193f36;color:#91f2ce;border-radius:30px;padding:10px 16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0}.card{background:#182a35;border-radius:15px;padding:22px}.value{font-size:32px;display:block;margin:8px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}canvas{width:100%;height:330px;background:#101c24;border-radius:10px}button,a{background:#75e7c0;border:0;border-radius:7px;color:#0d2921;padding:10px 16px;font:inherit;text-decoration:none;cursor:pointer}input{width:100%;accent-color:#75e7c0}li{margin:12px 0;line-height:1.45}table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;border-bottom:1px solid #30444f;padding:10px;overflow-wrap:anywhere}.good{color:#91f2ce}.muted{color:#b6c7ce}.controls{display:flex;justify-content:space-between;align-items:center;margin-top:12px}details{margin-top:20px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.warning{border-left:3px solid #e5be79;padding-left:14px}.footer{font-size:13px;margin-top:25px}@media(max-width:720px){.grid,.stats{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
+</style></head><body><main>
+<header><div><div class="label">GAITSENSE / ENGINEERING DEMO</div><h1>From a walking video to a saved report.</h1><p>Actual API + Atlas + MediaPipe worker results. Local verification replay, not the finished app.</p></div><a href="http://127.0.0.1:8000/docs" target="_blank" rel="noopener">Open API docs</a></header>
+<div id="status" class="pill">Loading recorded results…</div>
+<div class="stats"><div class="card">Live HTTP assertions<strong class="value" id="http">—</strong><span class="muted">Includes expected rejection responses</span></div><div class="card">Atlas schema<strong class="value" id="database">—</strong><span class="muted" id="indexes"></span></div><div class="card">Real video processing<strong class="value" id="runs">—</strong><span class="muted">Same clip repeated to test comparison</span></div></div>
+<div class="grid"><section class="card"><h2>33-landmark skeleton replay</h2><canvas id="pose" width="640" height="420" aria-label="Recorded MediaPipe skeleton from the successful API workflow"></canvas><input id="seek" type="range" min="0" max="0" value="0" aria-label="Pose frame"><div class="controls"><button id="play">Play replay</button><span id="frame" class="muted"></span></div><p>Landmarks retrieved through the authenticated pose API. The original recording is unchanged.</p></section>
+<section class="card"><h2>Experimental measurements</h2><div id="metrics"></div><h2>What the workflow verified</h2><ul><li>Register → log in → refresh → profile → consent</li><li>Upload → durable job → real worker → saved report</li><li>Private download → pose replay → history → export</li><li>Repeat-recording comparison → logout → deletion</li></ul><p class="warning">No health score, diagnosis, fall-risk prediction or medical recommendation. Repeated identical footage is a software check, not evidence of health change.</p></section></div>
+<details class="card"><summary>View unavailable measurements and quality warnings</summary><pre id="limits"></pre></details>
+<details class="card"><summary>Inspect each recorded API check</summary><table><thead><tr><th>Request</th><th>Actual / expected</th><th>Result</th></tr></thead><tbody id="checks"></tbody></table></details>
+<p id="cleanup" class="footer"></p><p id="time" class="footer muted"></p>
+</main><script>
+const el=id=>document.getElementById(id);let frames=[],index=0,timer=null;
+const canvas=el('pose');canvas.style.height='auto';
+const edges=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[27,29],[29,31],[27,31],[24,26],[26,28],[28,30],[30,32],[28,32],[0,1],[0,4]];
+let imageRatio=1;
+function draw(){if(!frames.length)return;const c=el('pose'),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);const points=frames[index].landmarks;const w=Math.min(c.width,c.height*imageRatio),h=w/imageRatio;const point=i=>[(c.width-w)/2+points[i].x*w,(c.height-h)/2+points[i].y*h];ctx.strokeStyle='#75e7c0';ctx.lineWidth=3;for(const[a,b]of edges){if(points[a].visibility<.6||points[b].visibility<.6)continue;ctx.beginPath();ctx.moveTo(...point(a));ctx.lineTo(...point(b));ctx.stroke()}ctx.fillStyle='#eefcf7';for(let i=0;i<points.length;i++){if(points[i].visibility<.6)continue;ctx.beginPath();ctx.arc(...point(i),4,0,2*Math.PI);ctx.fill()}el('seek').value=index;el('frame').textContent=`${(frames[index].timestampMs/1000).toFixed(2)} s · frame ${index+1}/${frames.length}`}
+function stop(){clearTimeout(timer);timer=null;el('play').textContent='Play replay'}
+function tick(){if(index>=frames.length-1){stop();return}const delay=frames[index+1].timestampMs-frames[index].timestampMs;timer=setTimeout(()=>{index++;draw();tick()},Math.max(1,delay))}
+el('play').onclick=()=>{if(timer){stop();return}if(index>=frames.length-1)index=0;el('play').textContent='Pause';draw();tick()};el('seek').oninput=e=>{stop();index=+e.target.value;draw()};
+fetch('results.json').then(r=>{if(!r.ok)throw Error('Results unavailable');return r.json()}).then(data=>{
+el('status').textContent=data.passed&&data.cleanup?'PASS · Workflow completed and temporary Atlas data cleaned up':'Incomplete run — inspect recorded checks';
+el('http').textContent=`${data.checks.filter(c=>c.passed).length} / ${data.checks.length}`;
+el('database').textContent=`${data.database.collections} collections`;
+el('indexes').textContent=`${data.database.applicationIndexes} application indexes · ${data.database.invalidDocuments} invalid documents`;
+el('runs').textContent=`${data.runs.length} completed runs`;
+const run=data.runs[0];
+if(run){
+frames=run.frames;el('seek').max=frames.length-1;
+imageRatio=run.capture.resolution.width/run.capture.resolution.height;
+for(const[key,value]of Object.entries(run.metrics)){
+const p=document.createElement('p');p.textContent=`${key}: ${typeof value==='number'?value.toFixed(4):value} ${run.definitions[key]?.unit||''}`;el('metrics').append(p)}
+el('limits').textContent=JSON.stringify({quality:run.quality,unavailable:run.unavailable},null,2);draw();
+}
+for(const check of data.checks){const tr=document.createElement('tr');for(const value of [`${check.method} ${check.route}`,`${check.status} / ${check.expected}`,check.passed?'PASS':'FAIL']){const td=document.createElement('td');td.textContent=value;tr.append(td)}el('checks').append(tr)}
+el('cleanup').textContent=data.cleanup||'Cleanup not confirmed';
+el('time').textContent=`Verification completed ${data.finishedAt}. These are recorded real results, not a live health monitor.`;
+}).catch(error=>{el('status').textContent=error.message});
+</script></body></html>

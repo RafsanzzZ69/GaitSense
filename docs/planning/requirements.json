@@ -1,0 +1,592 @@
+{
+  "version": "1.0-draft",
+  "source": "Requirements Analysis 2026-08-13 sections 2-24; Roadmap 2026-08-09",
+  "owner_roles": {
+    "mobile": "Mobile engineer",
+    "vision": "Vision/features engineer",
+    "ml": "ML engineer",
+    "research": "Research/team lead",
+    "data": "Data steward",
+    "platform": "Platform engineer",
+    "qa": "QA/evaluation lead"
+  },
+  "requirements": [
+    {
+      "id": "FR-01",
+      "title": "Local profiles",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "Create two offline profiles; restart app; each sees only its own history.",
+      "evidence": [
+        "frontend/src/app"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-02",
+      "title": "Video recording",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "Record, preview, discard and retry a 10-15 second clip on two phones in airplane mode.",
+      "evidence": [
+        "frontend/src/offline/OfflineCapture.tsx",
+        "docs/OFFLINE_ANDROID.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-03",
+      "title": "Quality rejection",
+      "priority": "core",
+      "status": "partial",
+      "owner": "vision",
+      "depends_on": [],
+      "acceptance": "Run frozen good/bad clips for blur, light, framing, distance and multiple people; explain correct rejection; pilot target >=90% correct acceptance of staged valid clips.",
+      "evidence": [
+        "backend/app/pipeline.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-04",
+      "title": "33-landmark pose extraction",
+      "priority": "core",
+      "status": "partial",
+      "owner": "vision",
+      "depends_on": [],
+      "acceptance": "Same frozen clip gives versioned timestamps/confidences and reproducible landmarks on laptop and offline phone within agreed tolerance.",
+      "evidence": [
+        "backend/app/pipeline.py",
+        "frontend/modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt",
+        "docs/OFFLINE_ANDROID.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-05",
+      "title": "Validated gait features",
+      "priority": "core",
+      "status": "partial",
+      "owner": "vision",
+      "depends_on": [
+        "FR-04"
+      ],
+      "acceptance": "Version all required features with units/view/missing rules; compare five core features to independent annotations; attach signed tolerance report.",
+      "evidence": [
+        "backend/app/pipeline.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-06",
+      "title": "Trained model inference",
+      "priority": "core",
+      "status": "partial",
+      "owner": "ml",
+      "depends_on": [
+        "FR-05",
+        "DATA-02",
+        "DATA-03"
+      ],
+      "acceptance": "Load selected classical artifact, validate feature version/order, compare held-out predictions and exported runtime parity; never use synthetic reports as evidence.",
+      "evidence": [
+        "research/gaitsense_poc/scripts/12_train_regression.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-07",
+      "title": "Human-readable report",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [
+        "FR-06"
+      ],
+      "acceptance": "Real offline recording produces measures, sub-scores, quality, limitations and explanations; low quality produces no misleading score.",
+      "evidence": [
+        "frontend/src/web/WebApp.tsx"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-08",
+      "title": "Non-diagnostic recommendations",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "research",
+      "depends_on": [
+        "ML-02"
+      ],
+      "acceptance": "Test every reviewed rule against low-score and unavailable-score fixtures; distinguish observation, suggestion and no-diagnosis notice.",
+      "evidence": [
+        "docs/planning/STUDY_PROTOCOL.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-09",
+      "title": "Local session history",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "SQLite sessions persist after restart without internet; no Atlas call is required.",
+      "evidence": [
+        "frontend/src/offline/OfflineCapture.tsx",
+        "frontend/modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-10",
+      "title": "Progress comparison",
+      "priority": "optional",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [
+        "FR-09"
+      ],
+      "acceptance": "Offline history compares only compatible protocol/feature versions; insufficient baseline is explained.",
+      "evidence": [
+        "frontend/src/web/WebApp.tsx"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-11",
+      "title": "Delete any/all data",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "Delete one session and entire profile offline; verify video, landmarks, features and local history removed with defined backup behavior.",
+      "evidence": [
+        "backend/app/worker.py",
+        "frontend/modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-12",
+      "title": "Offline PDF export",
+      "priority": "optional",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [
+        "FR-07"
+      ],
+      "acceptance": "Generate readable PDF offline from real report; check overflow, scores, date, quality and disclaimer on two phones.",
+      "evidence": [
+        "frontend/src/web/WebApp.tsx"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-13",
+      "title": "On-device inference",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [
+        "ML-03"
+      ],
+      "acceptance": "Complete recording to model/report in airplane mode; compare exported model output to Python fixtures within frozen tolerance.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md",
+        "docs/OFFLINE_ANDROID.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-14",
+      "title": "Capture guidance",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "First-time users follow framing, angle, countdown and retake guidance; no unsupported angle is scored.",
+      "evidence": [
+        "frontend/src/web/WebApp.tsx"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-15",
+      "title": "Cloud sync/accounts",
+      "priority": "excluded",
+      "status": "excluded",
+      "owner": "platform",
+      "depends_on": [],
+      "acceptance": "Not needed for offline acceptance; keep existing web/cloud tools optional with explicit consent.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FR-16",
+      "title": "Social sharing",
+      "priority": "excluded",
+      "status": "excluded",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "No public-sharing dependency in core; public demo contains only synthetic data.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-01",
+      "title": "Performance",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "qa",
+      "depends_on": [],
+      "acceptance": "Benchmark 15 second clips on two physical device tiers; full accepted pipeline <=60 seconds, report median/p95 and failures.",
+      "evidence": [
+        "docs/planning/STUDY_PROTOCOL.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-02",
+      "title": "Feature accuracy",
+      "priority": "core",
+      "status": "partial",
+      "owner": "vision",
+      "depends_on": [],
+      "acceptance": "Report cadence error against manual reference, proposed <=10% on >=90% accepted clips; freeze reviewer-approved targets before held-out evaluation.",
+      "evidence": [
+        "research/gaitsense_poc/README.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-03",
+      "title": "Responsive processing UI",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "During processing navigation/progress stays responsive; interruption and failure give recoverable state.",
+      "evidence": [
+        "frontend/src/web/WebApp.tsx"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-04",
+      "title": "Private video by default",
+      "priority": "core",
+      "status": "partial",
+      "owner": "platform",
+      "depends_on": [],
+      "acceptance": "Verify no video network traffic in offline core; default deletion after successful extraction; explicit study retention override is logged.",
+      "evidence": [
+        "backend/app/config.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-05",
+      "title": "Security",
+      "priority": "core",
+      "status": "partial",
+      "owner": "platform",
+      "depends_on": [],
+      "acceptance": "Verify app-private storage, ownership and deletion; optional network transport encrypted; no secrets or real videos in release package.",
+      "evidence": [
+        "backend/app/security.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-06",
+      "title": "First-use usability",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "qa",
+      "depends_on": [],
+      "acceptance": "Observe first-time users completing capture/result in <3 minutes; record failures and assistance rather than assuming success.",
+      "evidence": [
+        "docs/planning/STUDY_PROTOCOL.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-07",
+      "title": "Failure reliability",
+      "priority": "core",
+      "status": "partial",
+      "owner": "vision",
+      "depends_on": [],
+      "acceptance": "Run low visibility, missing joints, few cycles and corrupted clips; abstain with specific retake reason; review proposed 70% usable threshold.",
+      "evidence": [
+        "backend/app/pipeline.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-08",
+      "title": "Modularity",
+      "priority": "core",
+      "status": "partial",
+      "owner": "platform",
+      "depends_on": [],
+      "acceptance": "Swap pose/model adapter against fixed contracts without rewriting UI; feature/model versions reject incompatible input.",
+      "evidence": [
+        "backend/app/pipeline.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-09",
+      "title": "Single-user scope",
+      "priority": "core",
+      "status": "partial",
+      "owner": "research",
+      "depends_on": [],
+      "acceptance": "Offline operation requires no multi-tenant service; document optional cloud architecture separately.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-10",
+      "title": "Android compatibility",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "Confirm dependency SDK floors and test API 26 target or obtain explicit requirement amendment; test two physical device classes.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md",
+        "docs/OFFLINE_ANDROID.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-11",
+      "title": "Large-text accessibility",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "qa",
+      "depends_on": [],
+      "acceptance": "At largest supported system font, core controls and reports remain usable with clear labels and no clipped critical text.",
+      "evidence": [
+        "frontend/src/web/styles.css"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "NFR-12",
+      "title": "Zero-internet operation",
+      "priority": "core",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "Fresh installed release with bundled models completes capture to history/export/deletion in airplane mode without login/download.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "DATA-01",
+      "title": "Approved collection and consent",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "research",
+      "depends_on": [],
+      "acceptance": "A-01 through A-05 verified by human; each included record has actual signed current consent and code-only manifest.",
+      "evidence": [
+        "docs/planning/approvals.json"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "DATA-02",
+      "title": "Paired dataset and provenance",
+      "priority": "core",
+      "status": "partial",
+      "owner": "data",
+      "depends_on": [
+        "DATA-01"
+      ],
+      "acceptance": "Collect approved target cohort/trials; audit hashes, failures, independent annotations and true distance; reject visual estimates.",
+      "evidence": [
+        "research/gaitsense_poc/README.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "DATA-03",
+      "title": "Leakage-free evaluation split",
+      "priority": "core",
+      "status": "partial",
+      "owner": "ml",
+      "depends_on": [],
+      "acceptance": "Freeze split manifest; no participant/hash crosses train/validation/test; preprocessing and score reference fitted on training only.",
+      "evidence": [
+        "research/gaitsense_poc/scripts/12_train_regression.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "DATA-04",
+      "title": "Privacy lifecycle and withdrawal",
+      "priority": "core",
+      "status": "partial",
+      "owner": "data",
+      "depends_on": [],
+      "acceptance": "Approve exact retention dates; exercise coded withdrawal across videos/features/annotations/backups and verify access log.",
+      "evidence": [
+        "docs/planning/CONSENT_DRAFT.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "ML-01",
+      "title": "Baseline comparison and evaluation",
+      "priority": "core",
+      "status": "partial",
+      "owner": "ml",
+      "depends_on": [
+        "DATA-03"
+      ],
+      "acceptance": "Reproduce constant/linear and RF results with grouped tuning, untouched test set, uncertainty and failure report; no false superiority claim.",
+      "evidence": [
+        "research/gaitsense_poc/README.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "ML-02",
+      "title": "Explainable consistency sub-scores",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "ml",
+      "depends_on": [
+        "DATA-02"
+      ],
+      "acceptance": "Document symmetry, rhythm, posture and sway-proxy sub-scores relative to training reference; uncertainty/abstention and no health-number claim.",
+      "evidence": [
+        "docs/planning/STUDY_PROTOCOL.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "ML-03",
+      "title": "Exported model and lineage",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "ml",
+      "depends_on": [
+        "ML-01"
+      ],
+      "acceptance": "Export selected supported model with preprocessing; compare golden predictions across Python/mobile, feature order, hashes and versions.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "FEAT-01",
+      "title": "Core and recommended feature set",
+      "priority": "core",
+      "status": "partial",
+      "owner": "vision",
+      "depends_on": [],
+      "acceptance": "Define/test cadence, count, timing symmetry/variability, knee/hip angles, arm swing, trunk sway, shoulder/hip symmetry, normalized stride/speed and contact/swing timing; each needs reference or unavailable status, not invented outputs.",
+      "evidence": [
+        "backend/app/pipeline.py"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "EXT-01",
+      "title": "Advanced measurements",
+      "priority": "stretch",
+      "status": "not_started",
+      "owner": "vision",
+      "depends_on": [],
+      "acceptance": "Validate ankle angle, foot clearance, double support and optional head movement against appropriate references before enabling.",
+      "evidence": [
+        "docs/planning/STUDY_PROTOCOL.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "EXT-02",
+      "title": "Advanced experience",
+      "priority": "stretch",
+      "status": "partial",
+      "owner": "mobile",
+      "depends_on": [],
+      "acceptance": "Evaluate front/side fusion, personal baseline, richer local charts, Bangla and PDF; each has separate fixtures/user review.",
+      "evidence": [
+        "frontend/src/web/WebApp.tsx"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "EXT-03",
+      "title": "Anomaly/temporal models",
+      "priority": "stretch",
+      "status": "not_started",
+      "owner": "ml",
+      "depends_on": [],
+      "acceptance": "Evaluate Isolation Forest and any temporal smoothing with false positive rate and held-out subjects; no disease output.",
+      "evidence": [
+        "docs/planning/STUDY_PROTOCOL.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "RES-01",
+      "title": "Robustness study",
+      "priority": "core",
+      "status": "not_started",
+      "owner": "qa",
+      "depends_on": [],
+      "acceptance": "Quantify lighting/view/clothing/device variation and failures separately, without hazardous walking tasks.",
+      "evidence": [
+        "docs/planning/STUDY_PROTOCOL.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "RES-02",
+      "title": "Reproducible final delivery",
+      "priority": "core",
+      "status": "partial",
+      "owner": "research",
+      "depends_on": [],
+      "acceptance": "Ship APK, offline demo script, dataset/model cards, evaluation report, limitations, user guide and reproducible experiment commands.",
+      "evidence": [
+        "research/gaitsense_poc/README.md"
+      ],
+      "verified_at": null
+    },
+    {
+      "id": "SAFE-01",
+      "title": "Excluded claims and hardware",
+      "priority": "core",
+      "status": "partial",
+      "owner": "research",
+      "depends_on": [],
+      "acceptance": "Audit real and native demo screens: no diagnosis, clinical fall risk, treatment or universal health score; camera-only core, no unnecessary sensors/permissions.",
+      "evidence": [
+        "docs/planning/ARCHITECTURE.md"
+      ],
+      "verified_at": null
+    }
+  ]
+}

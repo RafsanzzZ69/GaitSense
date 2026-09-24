@@ -1,0 +1,7 @@
+.env
+.env.atlas
+backups/
+exports/
+local-data/
+.tmp-mongosh/
+*.log

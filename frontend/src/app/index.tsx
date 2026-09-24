@@ -1,0 +1,50 @@
+﻿import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Logo } from '@/components/ui';
+import { colors, radii } from '@/constants/theme';
+
+const features = [
+  { icon: 'camera-outline', title: 'Record naturally', text: 'A guided 10â€“15 second walk using the camera you already have.' },
+  { icon: 'analytics-outline', title: 'Understand your gait', text: 'See posture, symmetry, balance, joint motion, and walking pace.' },
+  { icon: 'trending-up-outline', title: 'Improve over time', text: 'Follow clear exercises and compare each assessment with your baseline.' },
+];
+
+export default function LandingScreen() {
+  const { width } = useWindowDimensions();
+  const wide = width >= 820;
+  return <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
+    <SafeAreaView>
+      <View style={styles.nav}><Logo /><View style={styles.navActions}>{wide && <Pressable onPress={() => router.push('/dashboard')}><Text style={styles.signIn}>Sign in</Text></Pressable>}<Pressable style={styles.navButton} onPress={() => router.push('/dashboard')}><Text style={styles.navButtonText}>Open dashboard</Text></Pressable></View></View>
+      <View style={[styles.hero, wide && styles.heroWide]}>
+        <View style={styles.heroCopy}>
+          <View style={styles.eyebrow}><View style={styles.liveDot} /><Text style={styles.eyebrowText}>CAMERA-BASED GAIT INSIGHTS</Text></View>
+          <Text style={[styles.heroTitle, !wide && styles.heroTitleSmall]}>A clearer picture of how you move.</Text>
+          <Text style={styles.heroText}>GaitSense turns a short walking video into understandable movement insightsâ€”no wearables, specialist equipment, or clinic visit required.</Text>
+          <View style={styles.heroActions}><Pressable style={styles.primaryButton} onPress={() => router.push('/assess')}><Text style={styles.primaryButtonText}>Start an assessment</Text><Ionicons name="arrow-forward" size={19} color={colors.white} /></Pressable><Pressable style={styles.textButton} onPress={() => router.push('/dashboard')}><Ionicons name="play-circle-outline" size={21} color={colors.primary} /><Text style={styles.textButtonText}>View sample report</Text></Pressable></View>
+          <View style={styles.trustRow}><Ionicons name="shield-checkmark" size={18} color={colors.primary} /><Text style={styles.trustText}>Private by design</Text><View style={styles.divider} /><Ionicons name="phone-portrait-outline" size={17} color={colors.primary} /><Text style={styles.trustText}>Phone & web</Text></View>
+        </View>
+        <View style={styles.visual}>
+          <View style={styles.visualGlow} />
+          <View style={styles.phone}>
+            <View style={styles.phoneTop}><Text style={styles.phoneTime}>10:24</Text><View style={styles.phonePill} /></View>
+            <Text style={styles.phoneLabel}>TODAY'S GAIT SCORE</Text><Text style={styles.phoneScore}>73</Text><Text style={styles.phoneUnit}>out of 100</Text>
+            <View style={styles.miniChart}>{[52, 61, 58, 68, 66, 73].map((h, i) => <View key={i} style={[styles.chartBar, { height: h }]} />)}</View>
+            <View style={styles.phoneResult}><View style={styles.resultIcon}><Ionicons name="checkmark" size={18} color={colors.primary} /></View><View><Text style={styles.resultTitle}>Steady improvement</Text><Text style={styles.resultText}>+6 points since your baseline</Text></View></View>
+          </View>
+          <View style={styles.floatCard}><Ionicons name="walk" size={21} color={colors.primary} /><View><Text style={styles.floatTitle}>Symmetry</Text><Text style={styles.floatValue}>80 Â· Good</Text></View></View>
+        </View>
+      </View>
+      <View style={styles.featureSection}><Text style={styles.kicker}>HOW IT WORKS</Text><Text style={styles.sectionTitle}>Insight in three simple steps</Text><View style={[styles.featureGrid, !wide && { flexDirection: 'column' }]}>{features.map((f, i) => <View key={f.title} style={styles.featureCard}><View style={styles.step}><Text style={styles.stepText}>0{i + 1}</Text></View><Ionicons name={f.icon as never} size={27} color={colors.primary} /><Text style={styles.featureTitle}>{f.title}</Text><Text style={styles.featureText}>{f.text}</Text></View>)}</View></View>
+      <View style={styles.disclaimer}><Ionicons name="information-circle-outline" size={19} color={colors.inkMuted} /><Text style={styles.disclaimerText}>GaitSense provides wellness and screening insights. It does not diagnose medical conditions or replace care from a qualified clinician.</Text></View>
+    </SafeAreaView>
+  </ScrollView>;
+}
+
+const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: colors.cream }, pageContent: { minHeight: '100%' }, nav: { height: 78, maxWidth: 1200, width: '100%', alignSelf: 'center', paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, navActions: { flexDirection: 'row', alignItems: 'center', gap: 24 }, signIn: { color: colors.ink, fontWeight: '700' }, navButton: { backgroundColor: colors.ink, borderRadius: 12, paddingHorizontal: 17, paddingVertical: 12 }, navButtonText: { color: colors.white, fontWeight: '700', fontSize: 13 },
+  hero: { maxWidth: 1200, width: '100%', alignSelf: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 82, gap: 54 }, heroWide: { flexDirection: 'row', minHeight: 610, alignItems: 'center' }, heroCopy: { flex: 1, maxWidth: 640 }, eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 22 }, liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }, eyebrowText: { color: colors.primaryDark, fontSize: 12, fontWeight: '800', letterSpacing: 1.3 }, heroTitle: { fontSize: 64, lineHeight: 68, letterSpacing: -2.8, fontWeight: '800', color: colors.ink }, heroTitleSmall: { fontSize: 43, lineHeight: 47, letterSpacing: -1.7 }, heroText: { fontSize: 18, lineHeight: 29, color: colors.inkMuted, marginTop: 23, maxWidth: 590 }, heroActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 20, marginTop: 31 }, primaryButton: { backgroundColor: colors.primary, borderRadius: 14, minHeight: 54, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 12 }, primaryButtonText: { color: colors.white, fontWeight: '800', fontSize: 15 }, textButton: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8 }, textButtonText: { color: colors.primaryDark, fontWeight: '700' }, trustRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 28 }, trustText: { fontSize: 12, color: colors.inkMuted, fontWeight: '600' }, divider: { height: 16, width: 1, backgroundColor: colors.line, marginHorizontal: 7 },
+  visual: { flex: 1, minHeight: 480, alignItems: 'center', justifyContent: 'center' }, visualGlow: { position: 'absolute', width: 390, height: 390, borderRadius: 195, backgroundColor: colors.mint }, phone: { width: 258, height: 450, borderRadius: 34, backgroundColor: colors.ink, borderWidth: 7, borderColor: '#172F39', padding: 23, transform: [{ rotate: '3deg' }], ...Platform.select({ web: { boxShadow: '0 30px 60px rgba(11,31,42,.20)' } as never, default: {} }) }, phoneTop: { height: 24, flexDirection: 'row', justifyContent: 'space-between' }, phoneTime: { color: '#A8BCBC', fontSize: 9 }, phonePill: { width: 48, height: 13, borderRadius: 8, backgroundColor: '#050F14' }, phoneLabel: { color: '#91B5AD', fontSize: 9, fontWeight: '800', letterSpacing: 1.2, textAlign: 'center', marginTop: 26 }, phoneScore: { color: colors.white, fontSize: 70, lineHeight: 74, fontWeight: '800', textAlign: 'center', marginTop: 6 }, phoneUnit: { color: '#8FA6A6', fontSize: 10, textAlign: 'center' }, miniChart: { height: 92, flexDirection: 'row', alignItems: 'flex-end', gap: 9, justifyContent: 'center', marginTop: 20, borderBottomWidth: 1, borderBottomColor: '#29424A' }, chartBar: { width: 18, borderTopLeftRadius: 5, borderTopRightRadius: 5, backgroundColor: colors.primary }, phoneResult: { backgroundColor: '#17343A', borderRadius: 14, marginTop: 23, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }, resultIcon: { width: 31, height: 31, borderRadius: 10, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' }, resultTitle: { color: colors.white, fontSize: 11, fontWeight: '700' }, resultText: { color: '#8FA6A6', fontSize: 8, marginTop: 3 }, floatCard: { position: 'absolute', left: '6%', bottom: 55, flexDirection: 'row', gap: 11, alignItems: 'center', backgroundColor: colors.white, padding: 15, borderRadius: 15, ...Platform.select({ web: { boxShadow: '0 14px 35px rgba(11,31,42,.16)' } as never, default: { elevation: 5 } }) }, floatTitle: { color: colors.inkMuted, fontSize: 10 }, floatValue: { color: colors.ink, fontWeight: '800', marginTop: 2 },
+  featureSection: { backgroundColor: colors.white, paddingHorizontal: 24, paddingVertical: 74, alignItems: 'center' }, kicker: { fontSize: 11, color: colors.primary, letterSpacing: 1.4, fontWeight: '800' }, sectionTitle: { color: colors.ink, fontSize: 34, fontWeight: '800', letterSpacing: -1, textAlign: 'center', marginTop: 10, marginBottom: 35 }, featureGrid: { maxWidth: 1100, width: '100%', flexDirection: 'row', gap: 18 }, featureCard: { flex: 1, minHeight: 220, padding: 25, borderWidth: 1, borderColor: colors.line, borderRadius: radii.lg }, step: { alignSelf: 'flex-end' }, stepText: { color: '#B1C0BC', fontWeight: '800', fontSize: 11 }, featureTitle: { fontSize: 18, fontWeight: '800', color: colors.ink, marginTop: 18 }, featureText: { fontSize: 14, color: colors.inkMuted, lineHeight: 22, marginTop: 9 }, disclaimer: { maxWidth: 1100, alignSelf: 'center', marginHorizontal: 24, marginVertical: 28, flexDirection: 'row', gap: 9, alignItems: 'flex-start' }, disclaimerText: { flex: 1, color: colors.inkMuted, fontSize: 11, lineHeight: 17 },
+});

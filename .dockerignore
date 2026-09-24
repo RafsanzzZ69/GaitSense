@@ -1,0 +1,15 @@
+.git
+**/.venv
+**/node_modules
+**/.env
+**/.env.*
+**/__pycache__
+**/*.MOV
+**/*.mp4
+**/*.pkl
+external
+tmp
+database/backups
+backend/storage
+frontend
+output
