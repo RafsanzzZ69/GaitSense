@@ -3,6 +3,22 @@
 Updated 24 September 2026. Repository: https://github.com/RafsanzzZ69/GaitSense
 Visibility: private. Primary branch: main. Use git log -1 for the latest commit.
 
+## Publication verification
+
+- Initial source commit: b6f51fda3eb9dfb30b3759fb9735cf0b6b3bbe60.
+- 201 reviewed files pushed; authenticated clean clone succeeded and the
+  42-requirement structure check passed from that clone.
+- Secret/data audit found only reviewed example/local-development credentials,
+  not Atlas passwords or API tokens. Participant records and build outputs are
+  excluded. No nested deployment repository was added.
+- Private prerelease: https://github.com/RafsanzzZ69/GaitSense/releases/tag/v0.1.0-prototype
+- Asset GaitSense-prototype.apk uploaded successfully; GitHub-reported size and
+  SHA-256 match the verified local APK. No rebuild was performed.
+- Study preparation GitHub Actions passed. Backend CI was still running at
+  publication verification; check GitHub Actions for its final result.
+- Clone was verified with the owner's existing credentials. Another teammate
+  must first receive repository access; no teammate account was impersonated.
+
 ## Completed and evidence
 
 - Offline Android source: muted recording, bundled MediaPipe processing, frame validation, SQLite session/frame history and deletion, cleanup/cancellation and privacy configuration.

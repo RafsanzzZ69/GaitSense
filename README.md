@@ -73,6 +73,8 @@ The downloader retrieves the official MediaPipe asset and checks its SHA-256. Ge
 
 The release variant currently uses development signing, not production store credentials. SQLite stores sessions and landmark frames locally. Temporary video cleanup, reload and deletion are implemented; native runtime acceptance is still pending. See [Android details](docs/OFFLINE_ANDROID.md).
 
+Authorized collaborators can download the existing [compile-verified prototype APK](https://github.com/RafsanzzZ69/GaitSense/releases/tag/v0.1.0-prototype). It has not yet passed installation/device acceptance; it is not a production release.
+
 ### Backend and MongoDB Atlas
 
 From the root:
