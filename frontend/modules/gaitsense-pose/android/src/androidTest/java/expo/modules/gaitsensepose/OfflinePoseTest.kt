@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -36,11 +37,15 @@ class OfflinePoseTest {
     throw AssertionError("Expected rejection")
   }
   @Test fun realVideoInferencePersistsReopensAndDeletes() {
-    val file = clip("walking.MOV")
+    // Keep walking.MOV unchanged for the historical short-interval/negative tests.
+    val arguments = InstrumentationRegistry.getArguments()
+    val fixture = arguments.getString("fixture") ?: "full-duration.MOV"
+    val view = arguments.getString("view") ?: "side_right"
+    val file = clip(fixture)
     val progress = mutableListOf<Double>()
     val start = System.currentTimeMillis()
     val raw = OfflinePoseProcessor(context, AtomicBoolean(false)) { progress.add(it) }
-      .process(Uri.fromFile(file).toString(), "side_left", true)
+      .process(Uri.fromFile(file).toString(), view, true)
     val result = JSONObject(raw)
     assertEquals(33, result.getInt("landmarkCount"))
     assertTrue(result.getDouble("usableFrameRatio") >= .7)
@@ -54,10 +59,27 @@ class OfflinePoseTest {
       store.readableDatabase.rawQuery("SELECT summary FROM sessions WHERE id=?", arrayOf(result.getString("id"))).use { c ->
         assertTrue(c.moveToFirst()); assertEquals(raw, c.getString(0))
       }
+      store.readableDatabase.rawQuery("SELECT timestamp,landmarks FROM frames WHERE session_id=? ORDER BY timestamp", arrayOf(result.getString("id"))).use { c ->
+        var inspected = 0
+        var previous = -1L
+        while (c.moveToNext()) {
+          assertTrue(c.getLong(0) > previous); previous = c.getLong(0)
+          val points = JSONArray(c.getString(1))
+          assertEquals(33, points.length())
+          for (i in 0 until 33) {
+            val point = points.getJSONObject(i)
+            assertEquals(i, point.getInt("index"))
+            for (key in listOf("x", "y", "z", "visibility", "presence")) assertTrue(point.getDouble(key).isFinite())
+          }
+          inspected++
+        }
+        assertEquals(result.getInt("poseFrames"), inspected)
+      }
       store.writableDatabase.delete("sessions", "id=?", arrayOf(result.getString("id")))
     }
     assertEquals(0, count("frames"))
-    println("GAITSENSE_NATIVE_RESULT frames=${result.getInt("poseFrames")} usable=${result.getDouble("usableFrameRatio")} elapsedMs=${System.currentTimeMillis()-start}")
+    assertEquals(0, count("sessions"))
+    println("GAITSENSE_NATIVE_RESULT fixture=$fixture view=$view durationMs=${result.getLong("durationMs")} sampled=${result.getInt("sampledFrames")} frames=${result.getInt("poseFrames")} usable=${result.getDouble("usableFrameRatio")} elapsedMs=${System.currentTimeMillis()-start}")
   }
   @Test fun cancellationSavesNothing() {
     val file = clip("walking.MOV")

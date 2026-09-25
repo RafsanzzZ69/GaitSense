@@ -1,6 +1,6 @@
 # GaitSense current state
 
-Updated 24 September 2026. Repository: https://github.com/RafsanzzZ69/GaitSense
+Updated 25 September 2026. Repository: https://github.com/RafsanzzZ69/GaitSense
 Visibility: private. Primary branch: main. Use git log -1 for the latest commit.
 
 ## Publication verification
@@ -34,13 +34,253 @@ Visibility: private. Primary branch: main. Use git log -1 for the latest commit.
 
 ## Important distinctions
 
-Source implementation and successful compilation are established. APK installation, startup, camera/MediaPipe execution, native instrumentation and SQLite restart persistence are NOT yet verified. Scientific validation is NOT established: the exploratory PoC has four participants, limited quality-passing clips and frame-estimated rather than independent clinical walking-speed labels.
+Full-duration emulator processing now PASS with the new authorized IMG_7570 fixture: the unchanged release APK saved 101 real MediaPipe frames with 33 landmarks each, reopened identical data after process restart, displayed saved landmarks and deleted the session/frames. The complete native suite passed 6/6. This supersedes the historical fixture blockers below. These are emulator fixture-injection results, not physical-camera/device acceptance. Scientific validation is NOT established: the exploratory PoC has four participants, limited quality-passing clips and frame-estimated rather than independent clinical walking-speed labels. The three new engineering fixtures have not been assigned invented participant identities or incorporated into the historical research cohort.
 
-## Exact next milestone — not started during publication
+## Android emulator verification — 24 September 2026
 
-Android emulator installation → native instrumentation testing → offline MediaPipe processing → SQLite persistence verification.
+- Workspace recovered clean on main at b3de31c. Existing release APK reused;
+  final SHA-256 still F8689C5AE992A1159369745D9261CD0425C609FE27270E4676E325EE29744640.
+  No release rebuild, dependency reinstall, cache clearing or Git push.
+- GaitSense_API35, Android 15/API 35, x86_64: installation, bundled-JS startup
+  and force-stop/cold relaunch PASS with airplane mode on, Wi-Fi/mobile data
+  disabled and no network route. APK has no INTERNET permission. Metro/FastAPI
+  were not listening on their usual ports. Tested inference/rejection/cleanup
+  paths need neither FastAPI nor MongoDB Atlas; this does not establish the
+  still-blocked successful save workflow.
+- Emulator graphics errors caused exits, including during the original native
+  run. Software rendering alone did not fully resolve this. Resumed with the
+  same AVD using -no-window -no-snapshot -gpu swiftshader; focused native run
+  and subsequent release UI checks completed without another emulator exit.
+- Synthetic-camera countdown/15-second capture reached preview. This is not
+  genuine walking-camera or physical-device verification. For release UI
+  inference checks, authorized real-video copies replaced synthetic recordings
+  in this fresh emulator app's Camera cache through root adb. Originals and
+  the APK were unchanged; this is fixture injection, not an app import feature.
 
-Inspect existing frontend scripts and native tests before proceeding. Reuse the existing APK/build cache; do not rebuild unnecessarily. Instrumentation requires approved private fixtures; keep them out of Git and release APKs. Then test real phones and align prototype portrait/720p capture with the study protocol.
+### Native instrumentation: 4 passed, 1 failed
+
+The original project script (android-build.ps1 -Action test -Architectures x86_64)
+compiled the test APK. Its report confirms passes for shortClipSavesNothing,
+consentAndPathBoundaries, transactionRollbackAndForeignKeys and
+cancellationSavesNothing. The fifth test lost the emulator during execution.
+On resume no Gradle process remained. Only that unresolved test was rerun via
+adb am instrument using the already installed test APK and a class#method filter.
+realVideoInferencePersistsReopensAndDeletes completed in 48.268 seconds and failed
+with the actual error: "Required joints visible in fewer than 70% of sampled
+frames; please retake". Successful tests were not rerun. The positive test remains
+failing; it has not been weakened or relabeled as successful.
+
+### Fixture diagnosis and offline results
+
+- walking.MOV is an exact SHA-256 match for the existing IMG_6843.MOV side-view
+  recording (9.955 seconds). Both the test and release UI selected side_left.
+  It contains an empty lead-in and insufficient usable full-body samples.
+- The native gate counts ALL requested 100 ms samples in its denominator;
+  a usable sample requires exactly one 33-point pose and selected-side shoulder,
+  hip, knee and ankle with visibility/presence >= 0.6 and x/y inside the image.
+  At least 70% must qualify. No threshold or duration checks were changed.
+- A diagnostic desktop run with the same model/settings and 768-pixel limit
+  found 100 samples: 37 without a pose, 60 usable on the left, 44 on the right.
+  Thus switching sides is not a remedy. These counts are diagnostic, NOT Android
+  measurements: desktop MediaPipe 0.10.35/OpenCV decoding differs from Android
+  MediaPipe 0.10.32/MediaMetadataRetriever.
+- The other duration-eligible existing side clip, IMG_6840.MOV (9.538 seconds),
+  yielded 64/96 left-side usable samples (66.7%) and 25 without a pose in the
+  desktop diagnostic. The unchanged release APK also rejected it at the 70%
+  gate. Remaining existing recordings are below the native 9.5-second minimum;
+  front-view recordings are also unsuitable for this side-view acceptance test.
+- Offline MediaPipe execution and correct rejection: PASS. Successful validated
+  processing: BLOCKED. Neither candidate produced a saved result. No fabricated
+  measurements, padded/looped video or validation bypass was used.
+- Both release rejection attempts removed their temporary video and left zero
+  session/frame rows. Mid-processing UI cancellation (progress was observed at
+  20% before cancellation) displayed "Processing cancelled; no result saved",
+  removed the temporary copy and left zero rows: PASS.
+- The UI leftover-cleanup control deleted an injected leftover MOV while keeping
+  a non-video sentinel in Camera cache; the test sentinel was then removed.
+  Final force-stop/relaunch and direct SQLite read still showed zero sessions
+  and zero frames. Temporary-file cleanup: PASS.
+- Native transaction rollback and foreign-key enforcement: PASS. Persistence,
+  reopening/inspection of actual saved landmarks and per-session/all-session
+  cascade deletion: BLOCKED, since no available tested fixture passed quality.
+  Empty history after restart is not evidence of saved-record persistence.
+
+### Evidence and next acceptance step
+
+Detailed private/local evidence is retained under output/emulator-verification/
+(Git-ignored), especially native-tests.log, original-native-results.xml,
+native-focused-original.log, fixture-diagnostics.log, candidate-result.xml,
+cancel-result.xml, cancel-counts.log, leftover-cleanup.log, final-counts.log,
+final-relaunch.log and final-apk-sha256.log. UI snapshots and diagnostic frames
+remain private local artifacts. Do not publish them or package test fixtures.
+
+At that checkpoint only this state document changed in tracked source. No confirmed application
+defect justified a code change or release rebuild. The emulator milestone is
+partially verified and blocked, not accepted as a complete workflow. Next obtain
+an authorized unmodified 10-15 second single-person side-view fixture meeting
+the existing quality gate, then finish positive extraction, persistence,
+restart inspection and deletion on the emulator. Physical-device acceptance
+(genuine recording, rotation/decoder behavior, interruption/process death,
+latency/heat and multiple phone tiers) remains entirely pending. No physical
+testing or research/ML work was started.
+
+## Follow-up: reuse all eight existing recordings — 24 September 2026
+
+### Mapping and metric reconciliation
+
+The private research VIDEO_AUDIT.md confirms the requested four side/four front
+mapping and participant IDs. data/metadata.csv confirms all participant IDs but
+still has view=unknown; it does not independently encode the camera views. No
+research metadata was modified. The old quality_summary.csv counts required
+landmark availability/non-null x, not the new 0.6 confidence, image-boundary,
+selected-side and single-person requirements. Its percentages are not native
+acceptance results.
+
+All eight originals were evaluated using the bundled model and native-style
+100 ms sampling/768-pixel limit on desktop (MediaPipe 0.10.35/OpenCV). Left/right
+values below are actual diagnostic usable counts, not Android measurements.
+Re-evaluating the two previously rejected clips was solely to retain per-sample
+visibility and identify usable intervals; identical failing Android tests were
+not rerun. Original video hashes were recorded before and after and all matched.
+
+| Video | Participant/view | Duration s | Usable left | Usable right | Full-duration suitability |
+| --- | --- | ---: | ---: | ---: | --- |
+| IMG_6834.MOV | P_01 / side | 7.570 | 49/76 (64.5%) | 18/76 (23.7%) | Too short; whole-clip quality below 70% |
+| IMG_6835.MOV | P_02 / side | 9.372 | 56/94 (59.6%) | 29/94 (30.9%) | Too short; whole-clip quality below 70% |
+| IMG_6840.MOV | P_03 / side | 9.538 | 64/96 (66.7%) | 6/96 (6.3%) | Native release quality rejection already verified |
+| IMG_6843.MOV | P_04 / side | 9.955 | 60/100 (60.0%) | 44/100 (44.0%) | Native release/test quality rejection already verified |
+| IMG_6836.MOV | P_01 / front | 4.118 | 42/42 (100%) | 42/42 (100%) | Too short and wrong view |
+| IMG_6839.MOV | P_02 / front | 5.787 | 56/58 (96.6%) | 56/58 (96.6%) | Too short and wrong view |
+| IMG_6841.MOV | P_03 / front | 9.255 | 77/93 (82.8%) | 72/93 (77.4%) | Too short and wrong view |
+| IMG_6845.MOV | P_04 / front | 7.787 | 72/78 (92.3%) | 72/78 (92.3%) | Too short and wrong view |
+
+Continuous all-usable left-side diagnostic intervals were 1.7-6.6 s (6834),
+3.0-8.6 s (6835), 6.5-8.8 s (6840) and 3.1-9.1 s (6843). These demonstrate
+usable walking footage, but none meets the native 9.5-second minimum. Trimming
+the poor lead-in does not create a valid full-duration clip. No looping,
+padding, duplicated frames or synthetic pose data was used.
+
+### Isolated native extraction and SQLite: PASS
+
+- Added ShortIntervalComponentTest under androidTest only. It makes a private
+  temporary copy of existing walking.MOV (unchanged IMG_6843), reads original
+  timestamps 4000..7900 ms at 100 ms spacing, and uses Android MediaPipe 0.10.32
+  plus the actual PoseStore. This is a four-second component experiment, not a
+  call to the full-duration OfflinePoseProcessor or a release UI success.
+- The component retains the >=70% visibility and <=5% multi-person gates.
+  Android result: sampled=40, usable=40 (100%), multiple=0, poseFrames=40,
+  33 landmarks per frame. Temporary video deletion passed before saving.
+- The project script's focused run passed (1 test, 0 failures; 97/104 Gradle
+  tasks up-to-date). Gradle uninstalled its test host afterward, so the same
+  compiled test APK was installed directly for the cross-process check.
+- Direct phase=save passed in 18.910 seconds, storing one session and 40 frames.
+  After force-stop, phase=inspect-delete passed in 0.484 seconds in a different
+  process (save PID 7647, inspection PID 7971). It compared persisted summary
+  and landmark SHA-256, inspected every timestamp/index and finite x/y/z/
+  visibility/presence value, deleted the session, reopened SQLite, and verified
+  zero sessions and zero frames. Cache cleanup also passed.
+- The test database belongs to expo.modules.gaitsensepose.test, not the release
+  app. Successful release history/inspection UI and full-duration processing
+  remain unverified. No synthetic records were inserted into the release app.
+- Native test inventory now has 5 passing tests (4 original plus the new
+  isolated component test) and 1 existing full-duration positive-test failure.
+  Save and inspection are phases of one additional test, not two new tests.
+  Original five-test results remain 4 passed / 1 failed. Its failed positive
+  test was neither weakened nor rerun without a new full-duration fixture.
+
+### Changes, evidence and remaining boundary
+
+Tracked changes: docs/CURRENT_STATE.md, the new ShortIntervalComponentTest.kt,
+and frontend/scripts/android-build.ps1 (optional TestRunnerArguments hashtable
+for focused class/phase execution). Production source, release APK and all
+eight original videos remain unchanged. APK SHA-256 still matches the value
+above. No dependencies/caches were reinstalled/cleared and nothing was pushed.
+
+Private evidence is in output/emulator-verification/existing-footage/: metrics.json,
+per-video *-samples.json, evaluation.md, original-hashes-before.json,
+original-hashes-verified.log, native-short-save.log, native-short-save-results.xml,
+native-save-for-restart.log, native-reopen-inspect-delete.log and
+native-short-metrics.log. Fixture interval/provenance is recorded in fixture.json.
+The emulator remained offline; no FastAPI, Atlas or Metro service was needed.
+
+No existing original qualifies for full release acceptance. To close that
+remaining boundary, a future authorized side-view recording must be 9.5-16.0 s
+(UI target 10-15 s), with a single person and the selected shoulder/hip/knee/ankle
+inside the image with visibility and presence >=0.6 in at least 70% of all
+samples. Keep the body visible from the start, avoiding empty lead-in/exit time.
+This is a precise future requirement, not a request to upload or record footage
+during this milestone. Physical-device testing and ML training were not started.
+
+
+## Full-duration emulator milestone completed — 25 September 2026
+
+Only the three new authorized videos were evaluated; the eight historical videos
+were not reanalysed. Existing short/negative fixtures were retained in the native
+suite. Originals, private test assets and output evidence are Git-ignored.
+Original SHA-256 checks before/after passed; no footage was modified or uploaded.
+
+| Original | Android duration | View used | Android usable samples | Gate | Selection |
+| --- | --- | --- | --- | --- | --- |
+| IMG_0460.MOV | 11.471 s | side_left | 85/115 = 73.91% | PASS | Backup; empty entry/exit, shorter visible walk |
+| IMG_7569.MOV | 12.523 s | side_right | 89/126 = 70.63% | PASS | Marginal backup; empty/partial entry and late framing limits |
+| IMG_7570.MOV | 10.048 s | side_right | 101/101 = 100% | PASS | Selected, untrimmed full recording |
+
+Percentages are the production Android usable-frame ratio (selected four joints,
+visibility AND presence >=0.6, in-frame, single pose), not mean confidence. The
+70% threshold and 9.5–16.0 s duration limits were unchanged. Android decoder
+metadata differs slightly from MOV movie-header/video-stream durations; exact
+values, resolution/FPS and visual review are in the private evaluation.md below.
+IMG_7570 has a continuous left-to-right side-view walk, full-body framing, no
+empty lead-in/out and no observed turnaround. No trimming, looping, duplicated
+or fabricated frames were used. Review of sequentially decoded images resolved
+an initial random-seek/camera-pan ambiguity; no clear turnaround was observed
+in the other two visible walking intervals either. Their weaker framing makes
+them less suitable than IMG_7570 despite passing the numeric gate.
+
+- Existing GaitSense_API35 API35/x86_64 AVD started with headless SwiftShader.
+  Airplane mode remained on, with no network route or Metro/FastAPI listeners.
+- Focused full-duration positive test: PASS, 1/1. Complete project-script native
+  instrumentation run afterward: PASS, 6 passed / 0 failed / 0 skipped.
+  The two additional candidate probes each passed once; these are separate
+  evaluations, not extra tests in the reported six-test suite.
+- Test-only changes select private full-duration.MOV (byte-identical IMG_7570)
+  and side_right by default, with optional fixture/view runner arguments.
+  Assertions now inspect all stored 33-point frames, finite values, ordered
+  timestamps and session/frame deletion. Build script checks the new asset.
+  Only the test APK was incrementally compiled; production code/APK unchanged.
+- Unchanged release APK: offline full-video inference PASS, 101 sampled/pose
+  frames, 100% usable, 33 landmarks/frame. Authorized fixture copied into the
+  synthetic-recording Camera-cache slot through root adb. This is fixture
+  injection, not a public import feature or genuine camera recording test.
+- Release SQLite save, app force-stop/cold relaunch, history reopening and
+  landmark inspection PASS. All 101 ordered rows (3333 landmarks) were finite
+  and byte-identical before/after process restart. UI Next frame advanced from
+  0 to 100 ms. UI Delete this session followed by another cold launch left
+  zero sessions and zero frames, with empty Camera cache. The immediate query
+  sent just after the delete tap preceded asynchronous completion; the final
+  post-relaunch database query and empty history confirm deletion completed.
+- Successful core extraction/storage required neither FastAPI nor MongoDB Atlas.
+  Native cancellation, short-video rejection, boundary checks and rollback/
+  foreign-key tests also passed in the six-test suite. Earlier release rejection
+  and mid-processing cancellation evidence remains historical, not rerun here.
+- APK SHA-256 remains F8689C5AE992A1159369745D9261CD0425C609FE27270E4676E325EE29744640.
+  No dependency reinstall, cache clearing, release rebuild, commit or push.
+
+Evidence: output/emulator-verification/new-footage/evaluation.md,
+focused-native.log, focused-results.xml, complete-native.log,
+complete-results.xml, android-0460.log, android-7569.log, native-metrics.log,
+release-summary.json, release-evidence-validation.json, release-*.xml,
+release-deleted-final-counts.log, release-camera-cleanup.log,
+originals-verified.log and apk-hash-after.log. Private landmark dumps and
+sequential contact sheets remain ignored on disk.
+
+This milestone changed this document, docs/OFFLINE_ANDROID.md,
+OfflinePoseTest.kt and the required-fixture list in android-build.ps1, plus
+ignored evidence/test copies. Earlier research cleanup, runner-argument support
+and ShortIntervalComponentTest changes were preserved. No emulator fixture
+blocker remains. Physical-device acceptance is the next separate milestone,
+only when authorized; it was not started. Research collection, feature validation
+and ML assessment remain incomplete and were not advanced by this verification.
 
 ## Remaining issues and decisions
 
@@ -54,4 +294,4 @@ Inspect existing frontend scripts and native tests before proceeding. Reuse the 
 
 ## Fresh-session handoff
 
-Work in C:/Users/user/Downloads/CSE400Project; private repository above, main branch. Read this document, frontend/AGENTS.md, docs/OFFLINE_ANDROID.md and the existing build/test scripts. The APK already compiled and passed static verification; no runtime success should be inferred. Continue only with the explicitly requested next milestone and approved fixtures. Preserve private files and avoid unrelated development.
+Work in C:/Users/user/Downloads/CSE400Project; private repository above, main branch. Read this document, frontend/AGENTS.md and docs/OFFLINE_ANDROID.md. Reuse the unchanged release APK and compiled native test APK. Full-duration emulator workflow is complete: 6/6 native tests plus release offline extraction, SQLite process-restart inspection and deletion PASS using IMG_7570. The historical unsuitable-fixture blocker is resolved. Recover existing logs before rerunning tests. Physical-device acceptance remains pending and requires a separately authorized task. Preserve private files and avoid unrelated development.

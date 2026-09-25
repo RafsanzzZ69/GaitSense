@@ -36,8 +36,10 @@ gait classifier, clinical score, calibrated measurement or dataset approval.
 - JS Android export and web regression export checked separately; neither is an APK.
 - Gradle release assembly passed on 23 September; static APK verification passed
   on 24 September. Kotlin/Java and JavaScript compilation, manifest permissions,
-  model digest and bundled native libraries passed. Installation, camera,
-  inference and restart persistence remain unverified. See CURRENT_STATE.md.
+  model digest and bundled native libraries passed. Full-duration emulator
+  offline inference, SQLite restart inspection and deletion subsequently passed
+  on 25 September; genuine camera/physical-device acceptance remains pending.
+  See CURRENT_STATE.md for current results and fixture-injection limitations.
 
 Tests exercise contract/state eligibility, frame validation, SQLite table SQL
 in Node's SQLite runtime (not Android SQLiteOpenHelper), rollback/cascade, model
@@ -65,6 +67,26 @@ Model script reuses existing verified model; downloads only when absent and
 dependency/model/build-tool downloads or a debug app relying on Metro.
 Builds use the generated development signing configuration unless a release
 keystore is separately configured; not an app-store production release.
+
+## Private native test fixtures
+
+Run the existing project script from the repository root:
+
+```powershell
+./frontend/scripts/android-build.ps1 -Action test -Architectures x86_64
+```
+
+The ignored `frontend/modules/gaitsense-pose/android/src/androidTest/assets/`
+directory requires `walking.MOV` (historical short-interval/negative fixture),
+`short.MOV` (duration rejection) and `full-duration.MOV` (positive full-video
+fixture). On the verified workstation, full-duration.MOV is an unchanged private
+copy of authorized IMG_7570.MOV, selected as side_right. Its SHA-256 is
+1F8081468C91503938D7B97A5B72D07F59EB409C9980DA5B6EAB55C24976616D.
+Do not replace walking.MOV: the historical interval test depends on it.
+Fixture/view runner overrides are supported through `-TestRunnerArguments`.
+Test assets and test APKs contain private footage; do not commit or distribute
+them. The release APK contains no participant videos and need not be rebuilt
+when only instrumentation fixtures/tests change.
 
 ## Physical device acceptance (all PENDING)
 

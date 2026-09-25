@@ -1,6 +1,7 @@
 param(
   [ValidateSet('assemble', 'test', 'install')][string]$Action = 'assemble',
-  [string]$Architectures = 'arm64-v8a,x86_64'
+  [string]$Architectures = 'arm64-v8a,x86_64',
+  [hashtable]$TestRunnerArguments = @{}
 )
 $ErrorActionPreference = 'Stop'
 $frontendRoot = Split-Path $PSScriptRoot -Parent
@@ -32,13 +33,19 @@ try {
   }
   if ($Action -eq 'test') {
     $fixtureDir = 'modules/gaitsense-pose/android/src/androidTest/assets'
-    foreach ($name in @('walking.MOV', 'short.MOV')) {
+    foreach ($name in @('walking.MOV', 'short.MOV', 'full-duration.MOV')) {
       if (!(Test-Path "$fixtureDir/$name")) { throw "Missing private test fixture: $fixtureDir/$name. See docs/OFFLINE_ANDROID.md." }
     }
   }
   Push-Location android
   try {
-    & .\gradlew.bat $gradleTask "-PreactNativeArchitectures=$Architectures" --max-workers=2 --console=plain
+    $runnerArgs = @()
+    if ($Action -eq 'test') {
+      foreach ($key in $TestRunnerArguments.Keys) {
+        $runnerArgs += "-Pandroid.testInstrumentationRunnerArguments.$key=$($TestRunnerArguments[$key])"
+      }
+    }
+    & .\gradlew.bat $gradleTask "-PreactNativeArchitectures=$Architectures" @runnerArgs --max-workers=2 --console=plain
     if ($LASTEXITCODE -ne 0) { throw "Gradle $Action failed." }
   } finally { Pop-Location }
 } finally { Pop-Location }
