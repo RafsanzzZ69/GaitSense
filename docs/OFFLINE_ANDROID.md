@@ -1,6 +1,7 @@
 # Offline Android landmark prototype
 
-26 September 2026. SAMSUNG DIAGNOSTIC UPDATE BUILT/VERIFIED; PHYSICAL RETEST PENDING.
+SAMSUNG UPDATE BUILT/VERIFIED; USER-REPORTED CAPTURE AND RESTART/DELETION CHECKS PASS.
+Complete offline-from-start capture/processing acceptance remains pending.
 
 ## Implemented scope
 
@@ -103,7 +104,7 @@ Application ID: com.gaitsense.research. VersionCode remains 1, versionName 0.1.0
 Signing certificate matches original (SHA-256
 fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c), with valid v2
 signatures. No downgrade; install as an update without uninstalling/clearing data.
-Manual Samsung installation behavior is still pending.
+The owner subsequently reports successful testing of this updated APK; see latest report below.
 
 Rollback: C:/Users/user/Downloads/CSE400Project/output/samsung-camera-update/GaitSense-rollback-F8689C5A.apk
 SHA-256: F8689C5AE992A1159369745D9261CD0425C609FE27270E4676E325EE29744640.
@@ -111,7 +112,34 @@ Rollback bytes preserved and reverified. Evidence: output/samsung-camera-update/
 The >5% multi-pose gate and 70% usable gate are unchanged; failed-video cleanup
 still runs. Overlap metrics are diagnostic only and never exempt a detection.
 
-## Physical device acceptance (partial, user-reported)
+## Latest Samsung acceptance report — user-reported
+
+The owner reports successful testing of the updated APK on Samsung Galaxy A25
+5G (SM-A256E, Android 16): genuine side_right recording, duration 11.533 s;
+processing 39.437 s; 116 saved pose frames, 111 usable (approximately 96%);
+zero multiple-person detections. Landmark inspection worked. The app reported
+raw video deleted; direct filesystem cleanup was not independently verified.
+
+Subsequent acceptance checks PASS by owner report: airplane mode enabled with
+Wi-Fi OFF; force-stop and reopen; the 116-frame session persisted; saved landmark
+navigation worked; manual session deletion; another force-stop and reopen;
+history correctly showed zero sessions. This establishes reported offline
+reopening/inspection and deletion persistence through the UI. It does NOT
+establish that a complete new capture and processing run occurred entirely
+offline, nor directly verify SQLite rows or validate scientific gait accuracy.
+No ADB, new test execution, APK rebuild or source changes accompanied this
+documentation update. No private screen-recording/video bytes were inspected.
+
+These results supersede the earlier pending Samsung restart-persistence status.
+Zero multiple detections in this recording does not prove all false-positive
+cases are resolved; black-preview resolution was not separately confirmed.
+Next recommended milestone: one controlled manual Samsung run with airplane
+mode and Wi-Fi OFF BEFORE launch/capture, verifying live framing, genuine
+capture, processing, restart inspection and deletion end-to-end. Retain only
+aggregate diagnostic evidence. Broader device/edge-case acceptance and scientific
+validation remain separate unfinished work.
+
+## Physical device acceptance (historical checklist and reports)
 
 Owner subsequently installed the original APK manually via Google Drive and
 reported genuine Samsung camera processing: 144 saved frames, 99% usable,

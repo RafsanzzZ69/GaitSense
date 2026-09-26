@@ -413,6 +413,33 @@ saved frames BEFORE deleting, then delete and restart again. Black preview,
 possible false rejection and physical restart persistence remain unverified;
 no complete physical acceptance is claimed.
 
+## Latest Samsung acceptance report — user-reported
+
+The owner reports successful testing of the updated APK on Samsung Galaxy A25
+5G (SM-A256E, Android 16): genuine side_right recording, duration 11.533 s;
+processing 39.437 s; 116 saved pose frames, 111 usable (approximately 96%);
+zero multiple-person detections. Landmark inspection worked. The app reported
+raw video deleted; direct filesystem cleanup was not independently verified.
+
+Subsequent acceptance checks PASS by owner report: airplane mode enabled with
+Wi-Fi OFF; force-stop and reopen; the 116-frame session persisted; saved landmark
+navigation worked; manual session deletion; another force-stop and reopen;
+history correctly showed zero sessions. This establishes reported offline
+reopening/inspection and deletion persistence through the UI. It does NOT
+establish that a complete new capture and processing run occurred entirely
+offline, nor directly verify SQLite rows or validate scientific gait accuracy.
+No ADB, new test execution, APK rebuild or source changes accompanied this
+documentation update. No private screen-recording/video bytes were inspected.
+
+These results supersede the earlier pending Samsung restart-persistence status.
+Zero multiple detections in this recording does not prove all false-positive
+cases are resolved; black-preview resolution was not separately confirmed.
+Next recommended milestone: one controlled manual Samsung run with airplane
+mode and Wi-Fi OFF BEFORE launch/capture, verifying live framing, genuine
+capture, processing, restart inspection and deletion end-to-end. Retain only
+aggregate diagnostic evidence. Broader device/edge-case acceptance and scientific
+validation remain separate unfinished work.
+
 ## Remaining issues and decisions
 
 - Study approvals A01–A05, consent/protocol decisions and independent prediction targets remain pending.
@@ -425,4 +452,13 @@ no complete physical acceptance is claimed.
 
 ## Fresh-session handoff
 
-Work in C:/Users/user/Downloads/CSE400Project; private repository above, main branch. Read this document, frontend/AGENTS.md and docs/OFFLINE_ANDROID.md. Use the verified Samsung diagnostic-update APK and preserved rollback described above. Full-duration emulator workflow is complete: 6/6 native tests plus release offline extraction, SQLite process-restart inspection and deletion PASS using IMG_7570. The historical unsuitable-fixture blocker is resolved. The owner manually installed the original APK and reported 144 frames/99% usable, then deliberately deleted that session. The new diagnostic APK is built/verified for manual update; do not depend on ADB. Next verify preview behavior, rejection diagnostics and restart persistence on Samsung. Preserve private files and avoid unrelated development.
+Work in C:/Users/user/Downloads/CSE400Project on main. Read this document and
+docs/OFFLINE_ANDROID.md. Updated APK SHA-256:
+18E69CF9F6A8BB54CF496D0A47131D6728475460E93872374A82B5EC9808D577.
+Emulator milestone passed previously. Owner now reports Samsung genuine capture/
+processing (11.533 s, 39.437 s, 116 saved/111 usable, zero multi detections),
+landmark inspection and offline force-stop/reopen persistence plus deletion
+persistence. Complete new capture/processing entirely offline is still unverified.
+Next: controlled manual offline-from-start Samsung acceptance run, including
+preview assessment. No scientific gait-accuracy claim. Preserve unrelated local
+research cleanup and untracked ShortIntervalComponentTest.kt. No ADB required.
