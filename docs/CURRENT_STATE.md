@@ -413,7 +413,7 @@ saved frames BEFORE deleting, then delete and restart again. Black preview,
 possible false rejection and physical restart persistence remain unverified;
 no complete physical acceptance is claimed.
 
-## Latest Samsung acceptance report — user-reported
+## Earlier Samsung acceptance report — user-reported
 
 The owner reports successful testing of the updated APK on Samsung Galaxy A25
 5G (SM-A256E, Android 16): genuine side_right recording, duration 11.533 s;
@@ -434,11 +434,41 @@ documentation update. No private screen-recording/video bytes were inspected.
 These results supersede the earlier pending Samsung restart-persistence status.
 Zero multiple detections in this recording does not prove all false-positive
 cases are resolved; black-preview resolution was not separately confirmed.
-Next recommended milestone: one controlled manual Samsung run with airplane
-mode and Wi-Fi OFF BEFORE launch/capture, verifying live framing, genuine
-capture, processing, restart inspection and deletion end-to-end. Retain only
-aggregate diagnostic evidence. Broader device/edge-case acceptance and scientific
+The then-pending offline-from-start milestone is now completed by the separate
+user-reported run below. Broader device/edge-case acceptance and scientific
 validation remain separate unfinished work.
+
+## Full offline Samsung acceptance — user-reported, 26 September 2026
+
+Core capture -> processing -> history -> restart -> deletion workflow: manually
+PASSED on Samsung Galaxy A25 5G (SM-A256E, Android 16), using the currently
+installed updated release APK. The owner enabled airplane mode and turned Wi-Fi
+OFF before opening GaitSense and kept both settings unchanged throughout.
+
+The owner recorded a NEW genuine walking video with the phone camera, processed
+it and extracted pose data entirely offline, and confirmed the session in local
+History. After closing and reopening GaitSense, the session remained available.
+The owner deleted it through the app, then closed and reopened the app again;
+History contained no previous session data. All these manual checks PASSED.
+Closing/reopening is reported here; force-stop was not specified for this run.
+
+This recording is distinct from the earlier 116-frame recording, whose offline
+checks covered already-saved session persistence, landmark inspection and
+persisted deletion. No frame counts, durations, view or other metrics were
+supplied for this NEW recording; earlier metrics must not be attributed to it.
+A screen recording was shared in ChatGPT according to the owner; it was not
+assumed available locally or inspected for this documentation checkpoint.
+
+This completes the previously pending full offline physical-device workflow
+milestone by user report. It does not establish direct SQLite inspection,
+scientific gait-measurement accuracy, clinical validation, broad device
+compatibility or formal privacy certification. Earlier automated/build results
+remain historical; no tests, rebuild, source changes or ADB operations were
+performed for this documentation update.
+
+Next pending milestone: targeted physical-device robustness checks, including
+repeated camera-preview/restart behavior and edge cases; broader device coverage
+and scientific gait-feature validation remain separate unfinished work.
 
 ## Remaining issues and decisions
 
@@ -455,10 +485,13 @@ validation remain separate unfinished work.
 Work in C:/Users/user/Downloads/CSE400Project on main. Read this document and
 docs/OFFLINE_ANDROID.md. Updated APK SHA-256:
 18E69CF9F6A8BB54CF496D0A47131D6728475460E93872374A82B5EC9808D577.
-Emulator milestone passed previously. Owner now reports Samsung genuine capture/
-processing (11.533 s, 39.437 s, 116 saved/111 usable, zero multi detections),
-landmark inspection and offline force-stop/reopen persistence plus deletion
-persistence. Complete new capture/processing entirely offline is still unverified.
-Next: controlled manual offline-from-start Samsung acceptance run, including
-preview assessment. No scientific gait-accuracy claim. Preserve unrelated local
+Emulator milestone passed previously. Earlier Samsung recording metrics remain
+11.533 s, 39.437 s, 116 saved/111 usable and zero multi detections; landmark
+inspection and offline force-stop/reopen persistence/deletion passed by report.
+A separate NEW recording now completes user-reported full offline capture,
+processing, History persistence after close/reopen, and deletion persistence.
+Airplane mode was ON and Wi-Fi OFF before launch and throughout this new run;
+no new recording metrics were supplied. Next: targeted physical-device robustness
+checks, including repeated preview/restart behavior and edge cases. Scientific
+validation and broader device coverage remain pending. Preserve unrelated local
 research cleanup and untracked ShortIntervalComponentTest.kt. No ADB required.
