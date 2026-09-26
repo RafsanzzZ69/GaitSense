@@ -1,6 +1,7 @@
 export type CapturePhase = 'ready' | 'countdown' | 'recording' | 'preview' | 'processing';
 export type SideView = 'side_left' | 'side_right';
 export type Session = {
+  diagnostics?: string;
   id: string; createdAt: number; durationMs: number; sampledFrames: number;
   poseFrames: number; usableFrameRatio: number; landmarkCount: number;
   view: SideView; rawVideoRetained: boolean; modelSha256: string;
@@ -16,7 +17,7 @@ export function canProcess(phase: CapturePhase, uri: string | null, consent: boo
 }
 export function parseSession(raw: string): Session {
   const value = JSON.parse(raw);
-  if (!value || typeof value.id !== 'string' || !value.id || value.landmarkCount !== 33 ||
+  if (!value || (value.diagnostics !== undefined && (typeof value.diagnostics !== 'string' || value.diagnostics.length > 2000)) || typeof value.id !== 'string' || !value.id || value.landmarkCount !== 33 ||
       value.rawVideoRetained !== false || !['side_left', 'side_right'].includes(value.view) ||
       !Number.isFinite(value.createdAt) || !Number.isFinite(value.durationMs) || value.durationMs < 9500 || value.durationMs > 16000 ||
       !Number.isInteger(value.sampledFrames) || value.sampledFrames <= 0 ||

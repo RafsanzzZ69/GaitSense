@@ -164,11 +164,17 @@ internal class OfflinePoseProcessor(
       digest.digest().joinToString("") { "%02x".format(it) }
     }
     require(hash == MODEL_HASH) { "Bundled pose model checksum mismatch" }
+    val started = android.os.SystemClock.elapsedRealtime()
     val retriever = MediaMetadataRetriever()
     try {
       retriever.setDataSource(source.path)
       val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0
       require(duration in 9500..16000) { "Record approximately 10-15 seconds before processing" }
+      val encodedWidth = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+      val encodedHeight = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+      val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+      var decodedSize = "unknown"
+      val diagnostics = PoseSampleDiagnostics()
       val options = PoseLandmarker.PoseLandmarkerOptions.builder()
         .setBaseOptions(BaseOptions.builder().setModelAssetPath(MODEL).build())
         .setRunningMode(RunningMode.VIDEO).setNumPoses(2)
@@ -176,14 +182,16 @@ internal class OfflinePoseProcessor(
         .setMinTrackingConfidence(0.6f).build()
       val frames = mutableListOf<Pair<Long, JSONArray>>()
       val required = if (view == "side_left") listOf(11, 23, 25, 27) else listOf(12, 24, 26, 28)
-      var sampled = 0; var usable = 0; var multiple = 0
+      var sampled = 0; var usable = 0
       PoseLandmarker.createFromOptions(context, options).use { detector ->
         for (timestamp in 0L until duration step 100L) {
           require(!cancelled.get()) { "Processing cancelled; no result saved" }
           sampled++
           // Requested sampling timestamps are stored, not claimed to be original frame PTS.
           val decoded = retriever.getFrameAtTime(timestamp * 1000, MediaMetadataRetriever.OPTION_CLOSEST)
+          if (decoded == null) diagnostics.observe(timestamp, emptyList())
           if (decoded != null) {
+            decodedSize = "${decoded.width}x${decoded.height}"
             val scale = minOf(1.0, 768.0 / maxOf(decoded.width, decoded.height))
             val resized = if (scale < 1) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
             val bitmap = if (resized.config == Bitmap.Config.ARGB_8888) resized else resized.copy(Bitmap.Config.ARGB_8888, false)
@@ -191,7 +199,9 @@ internal class OfflinePoseProcessor(
               val image = BitmapImageBuilder(bitmap).build()
               try {
                 val poses = detector.detectForVideo(image, timestamp).landmarks()
-                if (poses.size > 1) multiple++
+                diagnostics.observe(timestamp, poses.map { points -> points.map { p ->
+                  DiagnosticPoint(p.x(), p.y(), p.visibility().orElse(0f), p.presence().orElse(0f))
+                } })
                 if (poses.size == 1 && poses[0].size == 33) {
                   val landmarks = poses[0]
                   val good = required.all { i ->
@@ -214,14 +224,21 @@ internal class OfflinePoseProcessor(
         }
       }
       require(!cancelled.get()) { "Processing cancelled; no result saved" }
-      require(sampled > 0 && multiple.toDouble() / sampled <= .05) { "More than one person detected; record alone" }
+      val diagnosticText = "durationMs=$duration; processingMs=${android.os.SystemClock.elapsedRealtime() - started}; " +
+        "encoded=${encodedWidth}x${encodedHeight}; rotation=$rotation; decoded=$decodedSize; " +
+        "${diagnostics.report()}; usable=$usable; poseFrames=${frames.size}"
+      require(diagnostics.singlePersonGatePasses()) {
+        "Multiple pose candidates in more than 5% of samples; record alone. " +
+          "Overlapping detections are not proof of another person. Diagnostics: $diagnosticText"
+      }
       val ratio = usable.toDouble() / sampled
-      require(ratio >= .7) { "Required joints visible in fewer than 70% of sampled frames; please retake" }
+      require(ratio >= .7) { "Required joints visible in fewer than 70% of sampled frames; please retake. Diagnostics: $diagnosticText" }
       val id = UUID.randomUUID().toString()
       val summary = JSONObject().put("id", id).put("createdAt", System.currentTimeMillis())
         .put("durationMs", duration).put("sampledFrames", sampled).put("poseFrames", frames.size)
         .put("usableFrameRatio", ratio).put("view", view).put("modelSha256", hash)
-        .put("extractorVersion", "android-pose-0.1.0").put("landmarkCount", 33)
+        .put("diagnostics", diagnosticText)
+        .put("extractorVersion", "android-pose-0.1.1").put("landmarkCount", 33)
         .put("rawVideoRetained", false).put("consentVersion", "local-prototype-notice-v1")
         .put("timestampMethod", "requested-100ms-nearest-decoded-frame")
       // Delete source BEFORE committing a success result; failed cleanup cannot be reported as private success.

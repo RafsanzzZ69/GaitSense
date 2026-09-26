@@ -1,6 +1,6 @@
 # GaitSense current state
 
-Updated 25 September 2026. Repository: https://github.com/RafsanzzZ69/GaitSense
+Updated 26 September 2026. Repository: https://github.com/RafsanzzZ69/GaitSense
 Visibility: private. Primary branch: main. Use git log -1 for the latest commit.
 
 ## Publication verification
@@ -282,6 +282,137 @@ blocker remains. Physical-device acceptance is the next separate milestone,
 only when authorized; it was not started. Research collection, feature validation
 and ML assessment remain incomplete and were not advanced by this verification.
 
+## Samsung physical-device attempt — 26 September 2026
+
+Physical-device acceptance remains BLOCKED at installation. Samsung Galaxy A25
+5G SM-A256E, serial RRCX207054Y, was authorized (`device`) and responsive to
+model/API/One UI/storage/package queries. API 36 (Android 16); One UI property
+80500. Device reported approximately 54 GB available on /data. Package-path
+query found no installed com.gaitsense.research package before the attempt.
+
+The existing release APK SHA-256 matched the verified F8689C5A...744640 digest
+above. One explicitly Samsung-targeted `adb install --no-streaming -r` attempt
+timed out after 120 seconds with empty stdout/stderr. During that attempt a
+lightweight shell echo also timed out after 10 seconds. No installer/security
+error was available and installation success could not be established. No
+retry, server restart, settings change, rebuild or data deletion followed.
+
+Startup/UI, genuine camera capture, offline processing, physical SQLite
+save/reopen/inspection/deletion and cleanup remain NOT TESTED. No physical
+duration/quality/frame metrics exist. Earlier emulator results are unchanged.
+The USB/ADB transport becoming unresponsive during transfer is the observed
+blocker; cable/port/driver/handshake cause is not yet established and no APK
+defect has been demonstrated. Next task: stabilize sustained USB/ADB transfer
+with a known-good data cable/direct port and inspect targeted driver/ADB
+diagnostics, then check package state before any separately resumed install.
+
+Private local logs: output/physical-device-verification/connection-install.log
+and install.log. Research cleanup and ShortIntervalComponentTest.kt preserved.
+Only status documentation and ignored logs changed; nothing committed/pushed.
+
+## Samsung manual-camera report and diagnostic update — 26 September 2026
+
+The owner reports successful manual installation of the original release via
+Google Drive, launch of the offline interface and a genuine Samsung SM-A256E
+camera recording processed into 144 saved pose frames, 99% usable, side_left.
+The owner saw frame inspection/pose visualization and the raw-video-deleted
+history label. The owner explicitly deleted that session; subsequent empty
+history is expected, NOT an unexplained persistence failure. These are user-
+reported physical observations, not independently inspected video/log bytes.
+No attempt was made to recover deleted recordings. Airplane-mode conditions,
+exact duration/sample count, physical filesystem cleanup and restart persistence
+are not established by that report. It supersedes the historical installation
+blocker above, but complete physical acceptance remains pending.
+
+The next recording reported multiple-person rejection despite one observed
+subject; preview was black or cropped. Source inspection found a fixed 320-point
+camera viewport without ratio selection, using CameraX default fill/crop behavior.
+The update explicitly selects Expo 16:9 FIT_CENTER, fits a portrait 9:16 viewport
+within half the window, removes camera corner clipping, disables ScrollView
+clipped-child removal and adds readiness/mount-error feedback plus camera remount.
+720p remains a capture request, NOT the viewport's pixel resolution. App portrait
+orientation is unchanged. Black live preview itself is not reproduced or proven
+fixed; distinguish actual screen appearance from a screen-recording surface issue.
+
+Native multi-person rejection counts returned pose candidates (numPoses=2) in
+more than 5% of ALL samples. Detection/presence/tracking thresholds stay 0.6;
+required-joint visibility stays 70%, and multiple-pose samples remain unusable.
+No deduplication or confidence-based exemption is introduced. New diagnostics
+report sample/no-pose/multiple counts, first/last multiple timestamps, longest
+run, second-pose confident-joint range and overlap-candidate count. Overlap means
+at least four confident corresponding joints with mean normalized distance <=.05;
+it is a heuristic for investigation, NOT proof of a duplicate and NEVER changes
+acceptance. The exact cause of the reported rejection remains unconfirmed.
+
+Aggregate diagnostics also report metadata dimensions/rotation, decoded bitmap
+dimensions, duration and processing time through inference (before SQLite save).
+Failed quality attempts show selectable text only, with no new persistent pose/
+video record; normal finally cleanup remains. Success diagnostics accompany the
+existing summary, without a database migration. No raw image, coordinate trace,
+identity or external telemetry is added. Historical summaries remain readable.
+
+No ADB, emulator run, participant-file analysis, research changes, commit or push
+was used in this update. Previous APK preserved at
+output/samsung-camera-update/GaitSense-rollback-F8689C5A.apk with original SHA-256.
+Interrupted build recovery: the release build finished successfully in 3m 11s
+(544 tasks: 64 executed, 480 up-to-date). No Gradle/Java build process remained.
+No source corrections, rebuild, ADB action or repeat acceptance tests were needed
+on resume. Existing evidence confirms 10/10 focused frontend tests, 4/4 native
+JVM tests and TypeScript PASS; these checks were not unnecessarily rerun.
+
+Static integration verified: cameraPreviewSize supplies both live CameraView
+and video Preview; ratio=16:9 selects FIT_CENTER in the installed Expo module;
+Restart camera preview increments the CameraView key and resets readiness.
+Native diagnostics are included in rejection messages surfaced by reportError
+as selectable text. Native finally removal and frontend discard remain intact.
+This is source/build verification, not a Samsung rendering or false-positive fix
+confirmation.
+
+UPDATED APK: C:/Users/user/Downloads/CSE400Project/frontend/android/app/build/outputs/apk/release/app-release.apk
+Size: 117230407 bytes.
+SHA-256: 18E69CF9F6A8BB54CF496D0A47131D6728475460E93872374A82B5EC9808D577.
+This replaces the default output path's old APK; historical F8689C5A references
+above identify the rollback/original build, not this new output.
+
+Existing verify-android-apk.ps1 PASS: application identity, API 26 minimum,
+no INTERNET/audio/storage permissions, backup disabled, bundled JS/model,
+ARM64/x86_64 inference libraries and no participant videos. Packaged Hermes
+bundle equals the generated build bundle and differs from rollback; new preview
+restart/diagnostic text is present. DEX includes PoseSampleDiagnostics, overlap
+and second-pose metrics, updated rejection text and android-pose-0.1.1.
+
+Both APK signatures verify (v2), with matching certificate SHA-256:
+fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c.
+Both application IDs are com.gaitsense.research; versionCode 1 / versionName 0.1.0
+unchanged, so no version downgrade. Static identity/signing checks support an
+in-place manual update; Samsung installer behavior remains untested. Do not
+uninstall or clear application data. Rollback remains unchanged at
+C:/Users/user/Downloads/CSE400Project/output/samsung-camera-update/GaitSense-rollback-F8689C5A.apk
+(117229107 bytes; F8689C5AE992A1159369745D9261CD0425C609FE27270E4676E325EE29744640).
+
+Evidence under output/samsung-camera-update/: release-build.log,
+frontend-tests.log, typecheck.log, native-unit-results.xml, apk-verification.log,
+packaged-changes.json, update-compatibility.json and both signature/identity logs.
+Source/test files changed for this update: frontend/src/offline/OfflineCapture.tsx,
+framing.ts, contract.ts; frontend/tests/camera-framing.test.mjs;
+frontend/modules/gaitsense-pose/android/build.gradle;
+android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt and
+PoseSampleDiagnostics.kt; android/src/test/java/expo/modules/gaitsensepose/
+PoseSampleDiagnosticsTest.kt (last three paths relative to that module), plus
+CURRENT_STATE.md and OFFLINE_ANDROID.md. On resume only documentation and ignored
+verification evidence changed. Research cleanup and ShortIntervalComponentTest.kt
+remain untouched. Nothing committed/pushed.
+
+Next manual Samsung test: install this update over the existing app, enable
+airplane mode with Wi-Fi off, inspect the actual live preview upright (not only
+screen-recorded output), and record a single consenting subject walking from
+one side with head/feet in-frame for 10–15 seconds. Use Restart camera preview
+once if black; report whether it recovers and any mount error. Process and copy
+all diagnostic text, even if rejected. On success force-stop/reopen and inspect
+saved frames BEFORE deleting, then delete and restart again. Black preview,
+possible false rejection and physical restart persistence remain unverified;
+no complete physical acceptance is claimed.
+
 ## Remaining issues and decisions
 
 - Study approvals A01–A05, consent/protocol decisions and independent prediction targets remain pending.
@@ -294,4 +425,4 @@ and ML assessment remain incomplete and were not advanced by this verification.
 
 ## Fresh-session handoff
 
-Work in C:/Users/user/Downloads/CSE400Project; private repository above, main branch. Read this document, frontend/AGENTS.md and docs/OFFLINE_ANDROID.md. Reuse the unchanged release APK and compiled native test APK. Full-duration emulator workflow is complete: 6/6 native tests plus release offline extraction, SQLite process-restart inspection and deletion PASS using IMG_7570. The historical unsuitable-fixture blocker is resolved. Recover existing logs before rerunning tests. Physical-device acceptance remains pending and requires a separately authorized task. Preserve private files and avoid unrelated development.
+Work in C:/Users/user/Downloads/CSE400Project; private repository above, main branch. Read this document, frontend/AGENTS.md and docs/OFFLINE_ANDROID.md. Use the verified Samsung diagnostic-update APK and preserved rollback described above. Full-duration emulator workflow is complete: 6/6 native tests plus release offline extraction, SQLite process-restart inspection and deletion PASS using IMG_7570. The historical unsuitable-fixture blocker is resolved. The owner manually installed the original APK and reported 144 frames/99% usable, then deliberately deleted that session. The new diagnostic APK is built/verified for manual update; do not depend on ADB. Next verify preview behavior, rejection diagnostics and restart persistence on Samsung. Preserve private files and avoid unrelated development.

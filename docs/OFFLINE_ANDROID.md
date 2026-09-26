@@ -1,6 +1,6 @@
 # Offline Android landmark prototype
 
-24 September 2026. SOURCE AND APK BUILD VERIFIED; RUNTIME ACCEPTANCE PENDING.
+26 September 2026. SAMSUNG DIAGNOSTIC UPDATE BUILT/VERIFIED; PHYSICAL RETEST PENDING.
 
 ## Implemented scope
 
@@ -88,7 +88,64 @@ Test assets and test APKs contain private footage; do not commit or distribute
 them. The release APK contains no participant videos and need not be rebuilt
 when only instrumentation fixtures/tests change.
 
-## Physical device acceptance (all PENDING)
+## Verified Samsung update artifact
+
+Interrupted build completed: BUILD SUCCESSFUL in 3m 11s. No rebuild on resume.
+Prior focused checks: 10 frontend tests and 4 native JVM tests passed; TypeScript
+passed. Static APK verification and signature comparison passed on resume.
+The packaged JS matches generated output; new UI markers and native diagnostic
+DEX markers distinguish it from the rollback. No physical retest performed.
+
+APK: C:/Users/user/Downloads/CSE400Project/frontend/android/app/build/outputs/apk/release/app-release.apk
+Size: 117230407 bytes.
+SHA-256: 18E69CF9F6A8BB54CF496D0A47131D6728475460E93872374A82B5EC9808D577.
+Application ID: com.gaitsense.research. VersionCode remains 1, versionName 0.1.0.
+Signing certificate matches original (SHA-256
+fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c), with valid v2
+signatures. No downgrade; install as an update without uninstalling/clearing data.
+Manual Samsung installation behavior is still pending.
+
+Rollback: C:/Users/user/Downloads/CSE400Project/output/samsung-camera-update/GaitSense-rollback-F8689C5A.apk
+SHA-256: F8689C5AE992A1159369745D9261CD0425C609FE27270E4676E325EE29744640.
+Rollback bytes preserved and reverified. Evidence: output/samsung-camera-update/.
+The >5% multi-pose gate and 70% usable gate are unchanged; failed-video cleanup
+still runs. Overlap metrics are diagnostic only and never exempt a detection.
+
+## Physical device acceptance (partial, user-reported)
+
+Owner subsequently installed the original APK manually via Google Drive and
+reported genuine Samsung camera processing: 144 saved frames, 99% usable,
+side_left, with landmark inspection. Owner deliberately deleted that session.
+Restart persistence and physical cleanup verification remain pending. The
+historical ADB installation failure below does not negate the manual install.
+
+Samsung diagnostic update: live camera uses explicit 16:9 FIT_CENTER with a
+portrait 9:16 layout; viewport points differ from the 720p capture request.
+Black preview is not yet reproduced. Check the actual phone screen, not only a
+screen recording; use Restart camera preview once if needed and report any
+mount error. Portrait orientation remains required.
+
+The multi-pose/70% gates remain unchanged. Error text and new saved summaries
+show aggregate diagnostics (duration, pre-save processing time, encoded/decoded
+dimensions, rotation, sample/usable/multi counts and overlap indicators). These
+indicators never suppress detections. Failed-attempt diagnostics are transient;
+copy text before closing/restarting. No raw footage is retained for diagnosis.
+
+Next manual test: install the verified update OVER the existing app (do not
+uninstall or clear data). Enable airplane mode and turn Wi-Fi off. Hold upright,
+check the live image and full-body head/foot margins, choose the visible side,
+record one consenting subject walking continuously for 10–15 seconds without a
+turnaround, then process. Copy diagnostic text, including any rejection. If
+successful, force-stop through Android App info, reopen, inspect saved landmarks,
+then delete through GaitSense and repeat the restart to check empty history.
+Do not infer database-row deletion or cache-file removal solely from UI labels.
+
+26 September Samsung SM-A256E/API36 attempt: initial authorization and light
+shell queries passed; checksum-verified existing APK non-streaming installation
+timed out at 120 seconds without installer output. A concurrent lightweight
+shell check timed out at 10 seconds. Installation/startup not confirmed; no
+camera or processing acceptance performed. Stabilize sustained USB/ADB transport
+before resuming. See CURRENT_STATE.md and ignored physical-device-verification logs.
 
 | Test | Expected |
 | --- | --- |

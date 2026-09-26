@@ -1,20 +1,24 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { cameraPreviewSize } from './framing';
 import Pose from '../../modules/gaitsense-pose';
 import { canProcess, canRecord, parseFrames, parseSession } from './contract';
 import type { CapturePhase, PoseFrame, Session, SideView } from './contract';
 
-function Preview({ uri }: {uri: string}) {
+function Preview({ uri, size }: {uri: string; size: {width:number; height:number}}) {
   const player = useVideoPlayer(uri);
-  return <VideoView player={player} style={styles.camera} nativeControls contentFit="contain" />;
+  return <VideoView player={player} style={[styles.camera,size]} nativeControls contentFit="contain" />;
 }
 function Action({label,onPress,disabled=false}: {label:string; onPress:()=>void; disabled?:boolean}) {
   return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={[styles.button,disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
 }
 export default function OfflineCapture() {
+  const window = useWindowDimensions();
+  const previewSize = cameraPreviewSize(window.width, window.height);
+  const [cameraKey,setCameraKey] = useState(0);
   const [permission, requestPermission] = useCameraPermissions();
   const [phase,setPhase] = useState<CapturePhase>('ready');
   const [consent,setConsent] = useState(false);
@@ -115,7 +119,7 @@ export default function OfflineCapture() {
   ]);
   const active=phase==='countdown'||phase==='recording'||phase==='processing';
   const frame=frames[frameIndex];
-  return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content}>
+  return <SafeAreaView style={styles.page}><ScrollView removeClippedSubviews={false} contentContainerStyle={styles.content}>
     <Text style={styles.kicker}>GAITSENSE · OFFLINE ANDROID PROTOTYPE</Text>
     <Text style={styles.title}>Record. Extract. Keep it local.</Text>
     <Text style={styles.text}>Engineering prototype, not a health assessment. No gait score or diagnosis is produced. Pose landmarks are estimates.</Text>
@@ -126,20 +130,22 @@ export default function OfflineCapture() {
       <Text style={styles.heading}>Setup</Text><Text style={styles.text}>Use a steady phone, clear level path and even light. Keep one person's entire body visible from the side. Walk comfortably; stop if uncomfortable. Record 10–15 seconds. A three-second countdown precedes recording.</Text>
       <View style={styles.row}>{(['side_left','side_right'] as SideView[]).map(side=><Action key={side} label={view===side?`✓ ${side}`:side} disabled={active||!!uri} onPress={()=>setView(side)}/>)}</View>
       {!permission?.granted ? <Action label="Allow camera (no microphone)" onPress={()=>void requestPermission().catch(reportError)}/> : <>
-        {uri && phase==='preview' ? <Preview uri={uri}/> : phase!=='processing' && <CameraView key="camera" ref={camera} style={styles.camera} facing="back" mode="video" mute videoQuality="720p" onCameraReady={()=>setReady(true)} onMountError={e=>{setReady(false);setError(e.message);}}/>}
+        {uri && phase==='preview' ? <Preview uri={uri} size={previewSize}/> : phase!=='processing' && <CameraView key={cameraKey} ref={camera} style={[styles.camera,previewSize]} ratio="16:9" facing="back" mode="video" mute videoQuality="720p" onCameraReady={()=>setReady(true)} onMountError={e=>{setReady(false);setError(e.message);}}/>}
+        <Text style={styles.text}>Hold upright. Keep head and feet inside the live image throughout the walk; leave space around the body. Preview {previewSize.width} × {previewSize.height} layout points; capture requests 720p. Black bars are outside the image.</Text>
+        {phase==='ready' && <><Text style={styles.text}>{ready?'Camera initialized. Confirm the live image is visible before recording.':'Waiting for camera…'}</Text><Action label="Restart camera preview" onPress={()=>{setReady(false);setError('');setCameraKey(k=>k+1);}}/></>}
         {phase==='ready' && <Action label="Record 15-second video" disabled={!canRecord(phase,consent,ready,!!Pose)} onPress={()=>void record()}/>}
         {phase==='countdown' && <><Text accessibilityLiveRegion="polite" style={styles.heading}>Starting in {countdown}…</Text><Action label="Cancel countdown" onPress={()=>{interrupted.current=true;}}/></>}
         {phase==='recording' && <><Text style={styles.heading}>Recording {seconds}s / 15s</Text><Action label="Stop recording" onPress={()=>camera.current?.stopRecording()}/></>}
         {phase==='preview' && <><Action label="Extract landmarks on this phone" disabled={!consent} onPress={()=>void process()}/><Action label="Discard video / retake" onPress={()=>void discard()}/></>}
       </>}
       {phase==='processing' && <View style={styles.notice}><Text accessibilityLiveRegion="polite" style={styles.heading}>Extracting landmarks… {progress}%</Text><Text style={styles.text}>Keep the app open. This uses the bundled model, not a server.</Text><Action label="Cancel processing" onPress={()=>Pose?.cancel()}/></View>}
-      {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+      {!!error && <Text accessibilityRole="alert" selectable style={styles.error}>{error}</Text>}
       {!!frames.length && <View style={styles.notice}><Text style={styles.heading}>Saved landmark inspection</Text><Text style={styles.text}>{frames.length} pose frames · frame {frameIndex+1} · {frame?.timestampMs} ms</Text><View style={styles.plot}>{frame?.landmarks.filter(p=>p.visibility>=.6&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1).map(p=><View key={p.index} style={[styles.dot,{left:`${p.x*100}%`,top:`${p.y*100}%`}]}/>)}</View><View style={styles.row}><Action label="Previous frame" disabled={frameIndex===0} onPress={()=>setFrameIndex(i=>i-1)}/><Action label="Next frame" disabled={frameIndex===frames.length-1} onPress={()=>setFrameIndex(i=>i+1)}/></View><Text style={styles.text}>Normalized landmark preview only. Not a calibrated skeleton or gait measurement.</Text></View>}
       <Text style={styles.heading}>On-device history ({sessions.length}, latest 100)</Text>
       <Text style={styles.text}>If the app was force-closed during recording, a temporary camera video may remain. Clear leftovers below before lending or sharing this phone.</Text>
       <Action label="Clear leftover temporary camera videos" disabled={active||!!uri} onPress={()=>Alert.alert('Clear temporary recordings?','Deletes camera-cache videos from this app only, including interrupted recordings. Saved landmarks are kept.',[{text:'Cancel',style:'cancel'},{text:'Clear',style:'destructive',onPress:()=>void Pose!.clearTemporaryVideos().then(()=>setError('Temporary camera videos cleared.')).catch(reportError)}])}/>
       {sessions.length===0 && <Text style={styles.text}>No saved landmark sessions yet.</Text>}
-      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text><Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
+      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text>{s.diagnostics && <Text selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>}<Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
       {!!sessions.length && <Action label="Delete all local landmark history" disabled={active} onPress={()=>Alert.alert('Delete all local history?','This cannot be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete all',style:'destructive',onPress:()=>void Pose!.deleteAll().then(()=>{setFrames([]);return refresh();}).catch(reportError)}])}/>}
     </>}
   </ScrollView></SafeAreaView>;
@@ -149,7 +155,7 @@ const styles=StyleSheet.create({
   kicker:{fontSize:12,color:'#126b57',fontWeight:'700'},title:{fontSize:28,fontWeight:'800',color:'#16352e'},
   heading:{fontSize:18,fontWeight:'700',color:'#16352e'},text:{fontSize:16,lineHeight:24,color:'#344b45'},
   notice:{backgroundColor:'white',padding:16,borderRadius:14,gap:12},choice:{paddingVertical:12},
-  camera:{width:'100%',height:320,backgroundColor:'#142b34',borderRadius:14},
+  camera:{alignSelf:'center',backgroundColor:'#142b34'},
   button:{backgroundColor:'#126b57',padding:15,borderRadius:10,alignItems:'center'},
   buttonText:{color:'white',fontSize:16,fontWeight:'600'},disabled:{opacity:.4},row:{flexDirection:'row',flexWrap:'wrap',gap:10},
   error:{color:'#a02020',fontSize:16,lineHeight:24},plot:{height:300,backgroundColor:'#102d27',overflow:'hidden',borderRadius:10},

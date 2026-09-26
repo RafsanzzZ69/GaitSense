@@ -15,6 +15,7 @@ android {
   androidResources { noCompress += 'task' }
 }
 dependencies {
+  testImplementation 'junit:junit:4.13.2'
   implementation 'com.google.mediapipe:tasks-vision:0.10.32'
   androidTestImplementation 'androidx.test:runner:1.6.2'
   androidTestImplementation 'androidx.test.ext:junit:1.2.1'
