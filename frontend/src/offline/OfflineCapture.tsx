@@ -16,8 +16,8 @@ function Preview({ uri, size }: {uri: string; size: {width:number; height:number
   const player = useVideoPlayer(uri);
   return <VideoView player={player} style={[styles.camera,size]} nativeControls contentFit="contain" />;
 }
-function Action({label,onPress,disabled=false}: {label:string; onPress:()=>void; disabled?:boolean}) {
-  return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={[styles.button,disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
+function Action({label,onPress,disabled=false,accessibilityLabel=label}: {label:string; onPress:()=>void; disabled?:boolean; accessibilityLabel?:string}) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={[styles.button,disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
 }
 export default function OfflineCapture() {
   const window = useWindowDimensions();
@@ -161,7 +161,7 @@ export default function OfflineCapture() {
       <Text style={styles.text}>If the app was force-closed during recording, a temporary camera video may remain. Clear leftovers below before lending or sharing this phone.</Text>
       <Action label="Clear leftover temporary camera videos" disabled={active||!!uri} onPress={()=>Alert.alert('Clear temporary recordings?','Deletes camera-cache videos from this app only, including interrupted recordings. Saved landmarks are kept.',[{text:'Cancel',style:'cancel'},{text:'Clear',style:'destructive',onPress:()=>void Pose!.clearTemporaryVideos().then(()=>setError('Temporary camera videos cleared.')).catch(reportError)}])}/>
       {sessions.length===0 && <Text style={styles.text}>No saved landmark sessions yet.</Text>}
-      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text>{s.diagnostics && <Text selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>}<Action label="View saved analysis" disabled={active} onPress={()=>void analysisBinding.current?.select(s.id)}/><Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
+      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text>{s.diagnostics && <Text selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>}<Action label="View saved analysis" accessibilityLabel={`View saved analysis for session ${s.id}`} disabled={active} onPress={()=>void analysisBinding.current?.select(s.id)}/><Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
       {!!sessions.length && <Action label="Delete all local landmark history" disabled={active} onPress={()=>Alert.alert('Delete all local history?','This cannot be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete all',style:'destructive',onPress:()=>void (analysisBinding.current?.clear(),Pose!.deleteAll()).then(()=>{setFrames([]);return refresh();}).catch(reportError)}])}/>}
     </>}
   </ScrollView></SafeAreaView>;

@@ -30,7 +30,9 @@ export function createSavedAnalysisBinding(reads: SavedSessionReads, publish: (p
 }
 
 const measurement = (value: number | null, units: string) => value === null ? 'Unavailable' : `${value} ${units}`;
-const reasons = (values: readonly string[]) => values.length ? values.join(', ') : 'none';
+// Presentation only: retain the original codes in the immutable analysis contract.
+const readable = (value: string) => value.replace(/_/g, ' ');
+const reasons = (values: readonly string[]) => values.length ? values.map(readable).join(', ') : 'none';
 /** Actual text rows consumed by the native panel. No recomputation or numeric defaults. */
 export function savedAnalysisPanel(p: SavedAnalysisPresentation) {
   const groups: {title: string; lines: string[]; expandable?: boolean}[] = [];
@@ -48,7 +50,7 @@ export function savedAnalysisPanel(p: SavedAnalysisPresentation) {
     `Reasons: ${reasons(m.reasons)}`,
     ...(m.details?.candidates.map(c=>`${c.kind} candidate at ${c.timestampMs} ms requested`) ?? []),
     ...(m.details?.observations.filter(o=>o.reasons.length).map(o=>`${o.timestampMs} ms requested: ${measurement(o.value,m.units)}; ${reasons(o.reasons)}`) ?? []),
-    ...(m.details?.exclusions.map(e=>`Excluded observation ${e.observationIndex}: ${e.reason}`) ?? []),
+    ...(m.details?.exclusions.map(e=>`Excluded observation ${e.observationIndex}: ${readable(e.reason)}`) ?? []),
   ]});
   groups.push({title: `${i.label} · ${i.status}`, expandable: true, lines: [
     `Reasons: ${reasons(i.reasons)}`,
@@ -64,6 +66,6 @@ export function savedAnalysisPanel(p: SavedAnalysisPresentation) {
     'Native reads are noncancellable and non-atomic. History lists at most 100 summaries; absence from that list does not prove database-wide absence.',
   ]});
   return {title:p.label, status:p.status, sessionId:p.selection.sessionId,
-    lines:[`Scientific status: ${p.scientificStatus}`,`Data: ${p.dataStatus}`,
-      ...p.reasons.map(r=>`Reason: ${r}`),...(p.failureDetail?[`Read/processing detail: ${p.failureDetail}`]:[])],groups};
+    lines:[`Scientific status: ${p.scientificStatus} (not scientifically evaluated)`,`Data: ${p.dataStatus}`,
+      ...p.reasons.map(r=>`Reason: ${readable(r)}`),...(p.failureDetail?[`Read/processing detail: ${p.failureDetail}`]:[])],groups};
 }

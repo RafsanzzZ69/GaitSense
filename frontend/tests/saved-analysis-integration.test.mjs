@@ -34,7 +34,7 @@ test('production call without setup exposes all missing requirements despite dia
  const h=harness();await h.binding.select('A');const p=h.publications.at(-1),panel=savedAnalysisPanel(p);
  assert.equal(panel.status,'unavailable');assert.equal(p.dataStatus,'loaded');
  for(const key of ['geometry','direction','upright'])assert.equal(p.setup[key].status,'required');
- assert.match(text(p),/missing_geometry/);assert.match(text(p),/direction_required/);assert.doesNotMatch(text(p),/decoded=1920x1080/);
+ assert.match(text(p),/missing geometry/);assert.match(text(p),/direction required/);assert.doesNotMatch(text(p),/decoded=1920x1080/);
 });
 test('legitimately supplied setup can render partial result without knee geometry',async()=>{
  const f=fixture();delete f.setup.geometry;const h=harness(f);await h.binding.select('A',f.setup);const p=h.publications.at(-1);
@@ -44,7 +44,7 @@ test('legitimately supplied setup can render partial result without knee geometr
 });
 test('null knee values render unavailable, whereas real zero is preserved',async()=>{
  const f=fixture(),h=harness(f);await h.binding.select('A');
- let k=savedAnalysisPanel(h.publications.at(-1)).groups[1];assert.ok(k.lines.includes('200 ms requested: Unavailable; missing_geometry'));
+ let k=savedAnalysisPanel(h.publications.at(-1)).groups[1];assert.ok(k.lines.includes('200 ms requested: Unavailable; missing geometry'));
  await h.binding.select('A',f.setup);k=savedAnalysisPanel(h.publications.at(-1)).groups[1];
  assert.ok(k.lines.includes('200 ms requested: 0 degrees; none'));
 });
@@ -55,7 +55,7 @@ for(const method of ['listSessions','readFrames'])test(`${method} failure stays 
 });
 test('invalid frame data is distinctly rejected',async()=>{
  const h=harness(fixture(),{readFrames:async()=>'{'});await h.binding.select('A');const p=h.publications.at(-1);
- assert.equal(p.status,'invalid-data');assert.match(text(p),/malformed_frames_json/);
+ assert.equal(p.status,'invalid-data');assert.match(text(p),/malformed frames json/);
 });
 for(const same of [false,true])test(`screen ${same?'same-ID reselection':'session switch'} ignores stale completion`,async()=>{
  const h=race(),a=h.binding.select('A');await Promise.resolve();const b=h.binding.select(same?'A':'B');await Promise.resolve();
@@ -75,8 +75,8 @@ test('focus/unmount disposal prevents setState publication even on read rejectio
 });
 test('component reasons and exclusion rows reach the actual panel formatter',async()=>{
  const f=fixture();f.frames[20].landmarks[23].presence=.2;const h=harness(f);await h.binding.select('A',f.setup);
- const p=h.publications.at(-1);assert.equal(p.status,'partial');assert.match(text(p),/2000 ms requested: Unavailable; low_presence/);
- assert.match(text(p),/Excluded observation 0: boundary_support/);assert.match(text(p),/segment_mismatch/);
+ const p=h.publications.at(-1);assert.equal(p.status,'partial');assert.match(text(p),/2000 ms requested: Unavailable; low presence/);
+ assert.match(text(p),/Excluded observation 0: boundary support/);assert.match(text(p),/segment mismatch/);
 });
 test('evidence and scientific restrictions remain in visible panel copy',async()=>{
  const h=harness();await h.binding.select('A');const t=text(h.publications.at(-1));

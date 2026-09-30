@@ -83,3 +83,60 @@ Next bounded task: review the read-only panel's layout, accessibility and focus/
 behavior in a permitted UI test environment. Establish a separately reviewed, evidence-based
 setup acquisition policy before enabling numerical outputs for real saved sessions; do
 not fill the current metadata gaps with defaults.
+
+## Sprint 4 Task 7: local component review
+
+The existing Node test runner now server-renders production `SavedAnalysisPanel.tsx`
+through the installed React DOM and React Native Web packages, with TypeScript
+transpilation in memory. No new dependency or app test route was added. A seeded,
+server-rendered OfflineCapture History checks the real analysis action and its disabled
+state. Synthetic setup/data remain confined to tests.
+
+The review found expansion controls with text-only touch areas and indistinguishable
+accessible names. They now have a minimum 48-point height and component-specific
+show/hide labels. The close control also has an explicit minimum height. Status and
+group titles have heading roles; expanded state remains exposed. History analysis
+buttons identify their session to accessibility services. Scientific status retains
+`NOT_EVALUATED` visibly, with a plain-language explanation and spoken label. Displayed
+reason codes replace underscores with spaces; the underlying codes and analysis
+contract are unchanged. Status/reasons remain textual, not color-only information.
+
+The panel stays a vertical part of the existing ScrollView. Neither its text nor groups
+have fixed heights, line caps or ellipsis. Collapsed groups retain their reasons; setup
+and evidence limitations remain visible. Tests retain long IDs/reasons and rows from
+bounded observation/candidate/interval fixtures, distinguish null from numerical zero, and exercise
+partial, unavailable, read-failed and rejected-data output. No new numerical defaults,
+geometry extraction or scientific inference were introduced.
+
+Lifecycle tests render publications from the real binding with controlled native reads.
+They check switching, same-ID reselection, close/reopen, background invalidation and
+disposal. Source assertions check focus cleanup, AppState wiring, hiding a cleared
+selection and generation-keyed groups. The coordinator remains the sole owner of
+request-generation race protection; no lifecycle algorithm was changed.
+
+### What these checks do not establish
+
+Server rendering does not mount Expo Router or React Native, run layout, or execute
+React effects. Expansion tests call the production event handler with a controlled
+hook value, then render both branches; they do not test the mounted React scheduler.
+The History test seeds local state and stubs native modules. A 320-point viewport
+input is not evidence of correct small-screen wrapping. No screenshot, actual touch
+hit test, accessibility-tree inspection or screen-reader session was performed.
+
+Actual Android rendering, layout and accessibility have NOT yet been tested. Device
+acceptance must check long unbroken IDs, largest font scaling, scrolling with expanded
+results, TalkBack reading/focus order and expansion announcements, discoverability of
+the panel above History after pressing a lower row, route blur/refocus, background and
+foreground transitions, and unmount with pending reads. Native reads remain
+noncancellable/non-atomic and ownership is not independently authenticated.
+
+Local verification: 20 UI tests, 15 saved-analysis integration tests, 8 offline tests,
+2 recording-state tests and 2 camera-framing tests (47/47 PASS; no failures or skips).
+TypeScript and `git diff --check` passed, as did the whitespace check of the new
+untracked test file. No analytical production module changed, so
+engine suites are outside this task's rerun scope.
+
+The next bounded step is a separately authorized APK/device acceptance build and the
+checks above, using permitted existing data. Current saved metadata still cannot
+support numerical results without an independently established setup policy. This
+review does not authorize or claim scientific evaluation.
