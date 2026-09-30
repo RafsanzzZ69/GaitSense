@@ -1,12 +1,16 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { cameraPreviewSize } from './framing';
 import Pose from '../../modules/gaitsense-pose';
 import { canProcess, canRecord, parseFrames, parseSession } from './contract';
 import type { CapturePhase, PoseFrame, Session, SideView } from './contract';
+import { createSavedAnalysisBinding } from './saved-analysis-binding';
+import type { SavedAnalysisPresentation } from './analysis-presentation';
+import { SavedAnalysisPanel } from './SavedAnalysisPanel';
 
 function Preview({ uri, size }: {uri: string; size: {width:number; height:number}}) {
   const player = useVideoPlayer(uri);
@@ -32,6 +36,16 @@ export default function OfflineCapture() {
   const [sessions,setSessions] = useState<Session[]>([]);
   const [frames,setFrames] = useState<PoseFrame[]>([]);
   const [frameIndex,setFrameIndex] = useState(0);
+  const [analysis,setAnalysis] = useState<SavedAnalysisPresentation|null>(null);
+  const analysisBinding = useRef<ReturnType<typeof createSavedAnalysisBinding>|null>(null);
+  useFocusEffect(useCallback(()=>{
+    setAnalysis(null);
+    if (!Pose) return;
+    const binding=createSavedAnalysisBinding({listSessions:()=>Pose!.listSessions(),readFrames:id=>Pose!.readFrames(id)},setAnalysis);
+    analysisBinding.current=binding;
+    // Focus cleanup runs on leaving this route and on unmount. A new focus gets a new binding.
+    return ()=>{binding.dispose();analysisBinding.current=null;};
+  },[]));
   const camera = useRef<CameraView>(null);
   const mounted = useRef(true);
   const interrupted = useRef(false);
@@ -54,6 +68,7 @@ export default function OfflineCapture() {
     const progressSub = Pose?.addListener('onProgress', e=>{ if(mounted.current) setProgress(Math.round(e.percent)); });
     const stateSub=AppState.addEventListener('change', state=>{
       if(state !== 'active') {
+        analysisBinding.current?.leave();
         interrupted.current=true;
         if(phaseRef.current==='recording') camera.current?.stopRecording();
         Pose?.cancel();
@@ -115,7 +130,7 @@ export default function OfflineCapture() {
     }
   };
   const removeSession=(id:string)=>Alert.alert('Delete local session?','This permanently removes its stored landmarks from this phone.',[
-    {text:'Cancel',style:'cancel'}, {text:'Delete',style:'destructive',onPress:()=>void (async()=>{await Pose!.deleteSession(id);setFrames([]);await refresh();})().catch(reportError)}
+    {text:'Cancel',style:'cancel'}, {text:'Delete',style:'destructive',onPress:()=>void (async()=>{analysisBinding.current?.clear();await Pose!.deleteSession(id);setFrames([]);await refresh();})().catch(reportError)}
   ]);
   const active=phase==='countdown'||phase==='recording'||phase==='processing';
   const frame=frames[frameIndex];
@@ -141,12 +156,13 @@ export default function OfflineCapture() {
       {phase==='processing' && <View style={styles.notice}><Text accessibilityLiveRegion="polite" style={styles.heading}>Extracting landmarks… {progress}%</Text><Text style={styles.text}>Keep the app open. This uses the bundled model, not a server.</Text><Action label="Cancel processing" onPress={()=>Pose?.cancel()}/></View>}
       {!!error && <Text accessibilityRole="alert" selectable style={styles.error}>{error}</Text>}
       {!!frames.length && <View style={styles.notice}><Text style={styles.heading}>Saved landmark inspection</Text><Text style={styles.text}>{frames.length} pose frames · frame {frameIndex+1} · {frame?.timestampMs} ms</Text><View style={styles.plot}>{frame?.landmarks.filter(p=>p.visibility>=.6&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1).map(p=><View key={p.index} style={[styles.dot,{left:`${p.x*100}%`,top:`${p.y*100}%`}]}/>)}</View><View style={styles.row}><Action label="Previous frame" disabled={frameIndex===0} onPress={()=>setFrameIndex(i=>i-1)}/><Action label="Next frame" disabled={frameIndex===frames.length-1} onPress={()=>setFrameIndex(i=>i+1)}/></View><Text style={styles.text}>Normalized landmark preview only. Not a calibrated skeleton or gait measurement.</Text></View>}
+      {analysis && analysis.status!=='unselected' && <SavedAnalysisPanel presentation={analysis} onClear={()=>analysisBinding.current?.clear()}/>}
       <Text style={styles.heading}>On-device history ({sessions.length}, latest 100)</Text>
       <Text style={styles.text}>If the app was force-closed during recording, a temporary camera video may remain. Clear leftovers below before lending or sharing this phone.</Text>
       <Action label="Clear leftover temporary camera videos" disabled={active||!!uri} onPress={()=>Alert.alert('Clear temporary recordings?','Deletes camera-cache videos from this app only, including interrupted recordings. Saved landmarks are kept.',[{text:'Cancel',style:'cancel'},{text:'Clear',style:'destructive',onPress:()=>void Pose!.clearTemporaryVideos().then(()=>setError('Temporary camera videos cleared.')).catch(reportError)}])}/>
       {sessions.length===0 && <Text style={styles.text}>No saved landmark sessions yet.</Text>}
-      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text>{s.diagnostics && <Text selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>}<Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
-      {!!sessions.length && <Action label="Delete all local landmark history" disabled={active} onPress={()=>Alert.alert('Delete all local history?','This cannot be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete all',style:'destructive',onPress:()=>void Pose!.deleteAll().then(()=>{setFrames([]);return refresh();}).catch(reportError)}])}/>}
+      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text>{s.diagnostics && <Text selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>}<Action label="View saved analysis" disabled={active} onPress={()=>void analysisBinding.current?.select(s.id)}/><Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
+      {!!sessions.length && <Action label="Delete all local landmark history" disabled={active} onPress={()=>Alert.alert('Delete all local history?','This cannot be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete all',style:'destructive',onPress:()=>void (analysisBinding.current?.clear(),Pose!.deleteAll()).then(()=>{setFrames([]);return refresh();}).catch(reportError)}])}/>}
     </>}
   </ScrollView></SafeAreaView>;
 }
