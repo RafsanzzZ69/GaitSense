@@ -4,9 +4,11 @@ import {detectMotionCandidates} from './motion-candidates.ts';
 import {calculateCandidateMotionIntervals} from './motion-intervals.ts';
 import type {Session} from './contract.ts';
 import type {MotionResult} from './motion-candidates.ts';
+import type {ExplicitKneeGeometry} from './knee-flexion.ts';
 
 export const SESSION_ANALYSIS_VERSION='session-analysis-1';
 export type AnalysisRequest={session:unknown;frames:unknown;
+ geometry?:ExplicitKneeGeometry|null;
  context:{sessionId:string;participantId:string|null;attemptId:string|null;view:string;side:'left'|'right';
  direction:1|-1|null;upright:boolean;continuity:'detector-segments'|'unknown'};
  processing:{status:'completed'|'failed';reason:string|null}};
@@ -38,7 +40,7 @@ export function analyzeSavedSession(request:AnalysisRequest){
  // Both engines accept dense frame lists. Prevent sparse arrays from bypassing detector validation.
  if(!Array.isArray(request.frames)||Array.from({length:request.frames.length},(_,i)=>i).some(i=>!Object.hasOwn(request.frames as object,i)))
   return fail('incompatible',['invalid_frames'],session);
- const knee=analyzeKneeFlexion(session,request.frames);
+ const knee=analyzeKneeFlexion(session,request.frames,request.geometry);
  const motion=detectMotionCandidates(session,request.frames,{direction:ctx.direction as 1|-1,upright:ctx.upright as true});
  const kneeComponent={status:knee.status,reasons:[...knee.reasons],result:knee};
  const motionComponent={status:motion.status,reasons:[...motion.reasons],result:motion};

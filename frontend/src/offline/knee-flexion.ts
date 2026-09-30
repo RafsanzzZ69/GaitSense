@@ -13,7 +13,12 @@ export type KneeReason = 'invalid_session' | 'invalid_frames' | 'unsupported_vie
   | 'low_visibility' | 'low_presence' | 'out_of_frame' | 'degenerate_geometry'
   | 'missing_observations' | 'timestamp_gap' | 'irregular_sampling';
 export type TimeRange = { startMs: number; endMs: number };
-export type KneeGeometry = {
+export type ExplicitKneeGeometry = {
+  inferenceWidth: number; inferenceHeight: number;
+  source: 'caller-asserted-inference-dimensions';
+  assumption: 'constant-inference-dimensions-within-session';
+};
+export type KneeGeometry = (ExplicitKneeGeometry & {aspectRatio: number}) | {
   decodedWidth: number; decodedHeight: number; decodedAspectRatio: number;
   inferenceWidth: number; inferenceHeight: number; aspectRatio: number;
   source: 'android-pose-0.1.1-diagnostics';
@@ -102,7 +107,8 @@ function flexion(hip: Landmark, knee: Landmark, ankle: Landmark, aspect: number)
  * instead of rejecting all observations or poisoning the unselected side.
  * Structural corruption fails the whole request; numeric quality fails per sample.
  */
-export function analyzeKneeFlexion(sessionInput: unknown, framesInput: unknown): KneeResult {
+export function analyzeKneeFlexion(sessionInput: unknown, framesInput: unknown,
+  geometryInput?: ExplicitKneeGeometry | null): KneeResult {
   const result: KneeResult = {
     feature: 'selected-side-2d-projected-knee-flexion', units: 'degrees',
     algorithmVersion: 'projected-knee-1', configuration: KNEE_CONFIGURATION,
@@ -149,7 +155,13 @@ export function analyzeKneeFlexion(sessionInput: unknown, framesInput: unknown):
     }
   }
   const frames = framesInput as PoseFrame[];
-  result.geometry = legacyKneeGeometry(session);
+  // Undefined preserves the legacy API. Explicit null forbids diagnostic fallback.
+  result.geometry = geometryInput === undefined ? legacyKneeGeometry(session) :
+    object(geometryInput) && geometryInput.source === 'caller-asserted-inference-dimensions' &&
+    geometryInput.assumption === 'constant-inference-dimensions-within-session' &&
+    Number.isSafeInteger(geometryInput.inferenceWidth) && geometryInput.inferenceWidth > 0 &&
+    Number.isSafeInteger(geometryInput.inferenceHeight) && geometryInput.inferenceHeight > 0
+      ? {...geometryInput, aspectRatio: geometryInput.inferenceWidth / geometryInput.inferenceHeight} : null;
   result.quality.observedCount = frames.length;
   result.quality.missingObservationCount = session.sampledFrames - frames.length;
   result.timeRange = { startMs: frames[0].timestampMs, endMs: frames[frames.length - 1].timestampMs };

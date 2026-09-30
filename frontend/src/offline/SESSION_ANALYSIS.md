@@ -150,3 +150,113 @@ processing failure and successful zero-candidate computation. No same-shaped fra
 can authenticate its ownership; the adapter can check caller binding only. Keep the current
 ID restriction until an explicit mapping policy is selected. The entire Sprint 4 batch
 remains local pending its separately authorized checkpoint.
+
+## Saved-payload adapter (Sprint 4 Task 3)
+
+`analyzeSavedPayload` in `saved-payload-analysis.ts` is the pure, bounded entry point
+for native saved JSON. `SavedPayloadRequest` describes the caller envelope; runtime
+input is unknown and validated. It accepts a selected session ID, a `sessionRead`
+and `framesRead`, each carrying that ID and either `{status: 'loaded', payload}`
+or `{status: 'failed', reason}`. The session payload is one selected summary from
+listSessions, serialized as JSON, not the entire summary list. The frames payload
+is the unmodified string returned by readFrames(selectedSessionId).
+
+The future loader must capture the ID at read dispatch, bind both read envelopes
+to it, and discard stale completions when selection changes. Matching IDs verify
+caller binding only: native frame objects carry no ownership identity, so replacing
+a payload with another same-shaped recording cannot be detected or authenticated.
+No loader or UI connection is implemented in this task.
+
+Validation rejects malformed JSON/envelopes, identity mismatches, missing/extra
+loaded observations relative to poseFrames, invalid native sample counts, noninteger,
+negative or out-of-duration timestamps, duplicates and decreasing timestamps, and
+malformed 33-index landmark arrays. All coordinate/quality fields must be finite
+numbers; visibility and presence must be in [0,1]. JSON texts are limited to 16,384
+session and 2,097,152 frame UTF-16 code units, with at most 160 frames. These are
+adapter resource bounds, not storage schema changes. Validation stops at the first
+failure. No sorting, resampling, interpolation or count repair occurs.
+
+Read failures return `load-failed`, their reason/detail and `analysis: null`;
+invalid payloads return `incompatible` and `analysis: null`. They never become
+processing-failed records or successful empty recordings. Successful validated
+reads invoke the existing wrapper with processing completed, consistent with native
+persistence of successful extractions only. `sampledFrames - poseFrames` remains
+an extraction omission count, separate from an incomplete load. No individual
+omission cause is reconstructed. Low but valid confidence and out-of-frame
+coordinates pass through to component quality masks, null values, gaps and exclusions.
+
+Optional `setup` supplies analysis metadata, separately from storage:
+
+- `geometry`: positive integer inferenceWidth/inferenceHeight, with
+  source=`caller-asserted-inference-dimensions` and
+  assumption=`constant-inference-dimensions-within-session`. These must describe the
+  actual inference coordinate system across this recording, established independently
+  of diagnostic text. This is a caller assertion, not verified image correspondence.
+- `direction`: +1 increasing image x or -1 decreasing image x; absent/null blocks motion.
+- `upright`: only explicit true confirms the required orientation; absent/false blocks motion.
+- `participantId` / `attemptId`: explicitly supplied IDs or null; omitted stays null.
+- `continuity`: explicit detector-segments requests freshly checked detector continuity;
+  omitted/unknown leaves dependent intervals unavailable. It never proves physical-cycle completeness.
+
+The knee engine and wrapper now accept an optional explicit geometry argument.
+The adapter ALWAYS passes an explicit value or null, disabling diagnostic fallback.
+Missing/invalid geometry leaves knee unavailable with missing_geometry while supported
+motion/intervals remain usable. Legacy direct callers that omit the new argument
+retain their existing behavior and regression tests; the adapter never invokes that
+legacy geometry path. The numerical formula and existing algorithm/configuration
+versions are unchanged; the additive geometry result is discriminated by source.
+
+The full wrapper result is retained under `analysis`, including provenance, component
+statuses, versions, masks, exclusions and null measurements. The adapter adds its own
+version, count audit, caller-binding limitation and setup provenance. Missing assertions
+never become scientific evidence. Actual decoded PTS and exact-image identity remain
+unavailable. Arbitrary incompatible IDs are preserved and block only intervals, with
+no mapping policy introduced. Scientific status remains NOT_EVALUATED; motion extrema
+are candidates and intervals are not validated step/stride times.
+
+Recommended next task: implement a small saved-session loading coordinator with a mocked
+native API and stale-selection/race tests. It should create these bound envelopes and
+carry explicit setup, before any UI integration. Existing historical sessions without
+independently established inference geometry/direction/upright remain limited; diagnostics
+cannot repair these missing facts. No native/schema/APK/ADB/database work is needed for
+that coordinator.
+
+Task 3 verification (local synthetic data only): 56 adapter tests plus the existing
+40 session-wrapper tests passed within a 242/242 focused analytical regression run;
+0 failures, skips or cancellations. TypeScript (`npm run typecheck`) passed.
+The focused command, from frontend, was:
+
+```text
+node --experimental-strip-types --test tests/saved-payload-analysis.test.mjs tests/session-analysis.test.mjs tests/session-analysis-saved.test.mjs tests/knee-flexion.test.mjs tests/knee-comparison.test.mjs tests/motion-candidates.test.mjs tests/motion-intervals.test.mjs tests/motion-interval-integration.test.mjs tests/motion-integration.test.mjs
+npm run typecheck
+```
+
+Node emitted the existing MODULE_TYPELESS_PACKAGE_JSON warning; no package/module
+configuration was changed. No commit or push was performed.
+
+### Fresh verification after interrupted-task recovery
+
+The recovered implementation required no source corrections. Fresh per-file runs
+using `node --experimental-strip-types --test --test-reporter=tap tests/<name>.test.mjs`
+passed on the final source:
+
+| Test file | Passed |
+| --- | ---: |
+| saved-payload-analysis.test.mjs | 56 |
+| session-analysis.test.mjs | 16 |
+| session-analysis-saved.test.mjs | 24 |
+| knee-flexion.test.mjs | 16 |
+| knee-comparison.test.mjs | 18 |
+| motion-candidates.test.mjs | 37 |
+| motion-integration.test.mjs | 29 |
+| motion-intervals.test.mjs | 29 |
+| motion-interval-integration.test.mjs | 17 |
+| motion-interval-sensitivity.test.mjs | 16 |
+| motion-matching.test.mjs | 42 |
+| motion-cohort.test.mjs | 32 |
+| Total | 332 |
+
+All runs exited 0, with no failures, skips, cancellations or todos.
+`npm run typecheck` passed. `git diff --check` found no whitespace errors.
+HEAD remained fe650bc8fbca9d618c1434c1a6735ec4f4c05d6f. Unrelated local work was
+preserved; nothing was staged, committed or pushed.
