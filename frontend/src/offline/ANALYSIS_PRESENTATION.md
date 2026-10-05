@@ -3,9 +3,15 @@
 `presentSavedAnalysis(state)` accepts the public `SavedSessionLoadState` from the
 production saved-session loader. The existing adapter/wrapper result is nested in
 that state; do not pass independently merged component results. Contract version:
-`saved-analysis-presentation-1`. This is a pure projection with no IO or new analysis
+`saved-analysis-presentation-2`. This is a pure projection with no IO or new analysis
 mathematics. It returns a detached, deeply frozen snapshot with recursive readonly
 TypeScript types, preserving numerical zero and null as distinct values.
+
+Sprint 5 adds `setup.geometry.status: persisted-native` for geometry observed and
+stored by the inference bitmap path. Its full geometry provenance is retained in
+the component and setup value. Caller geometry remains caller-asserted; conflicts
+remain unavailable with explicit reasons. See `ANALYSIS_METADATA.md` for the versioned
+storage contract. Direction/upright requirements are unchanged.
 
 ## States and component rules
 

@@ -1,0 +1,21 @@
+{
+  "contractVersion": "saved-analysis-metadata-1",
+  "geometry": {
+    "status": "available",
+    "inferenceWidth": 768,
+    "inferenceHeight": 432,
+    "source": "native-inference-bitmap",
+    "constantDimensions": true,
+    "observedInferenceCalls": 100,
+    "scope": "all-inference-calls",
+    "transform": {
+      "resize": "fit-longest-edge-768-no-upscale",
+      "pixelFormat": "ARGB_8888",
+      "applicationRotationDegrees": 0,
+      "applicationMirror": false,
+      "decoderOrientation": "platform-output-not-upright-assertion"
+    }
+  },
+  "direction": {"status": "unassessed", "value": null, "source": null},
+  "upright": {"status": "unassessed", "value": null, "source": null}
+}

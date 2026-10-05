@@ -13,9 +13,12 @@ android {
     testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
   }
   androidResources { noCompress += 'task' }
+  sourceSets { test.resources.srcDir '../../../tests/fixtures' }
 }
 dependencies {
   testImplementation 'junit:junit:4.13.2'
+  // Real JSON implementation for JVM serialization checks (Android stubs cannot serialize).
+  testImplementation 'org.json:json:20180813'
   implementation 'com.google.mediapipe:tasks-vision:0.10.32'
   androidTestImplementation 'androidx.test:runner:1.6.2'
   androidTestImplementation 'androidx.test.ext:junit:1.2.1'

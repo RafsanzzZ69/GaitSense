@@ -106,6 +106,14 @@ test('loaded but fully unavailable displays all missing setup and excludes diagn
  assert.match(html,/One travel direction in image x: required/);assert.match(html,/Explicit upright orientation confirmation: required/);
  assert.doesNotMatch(html,/decoded=1920x1080|1920 × 1080/);
 });
+test('new native metadata renders partial knee output while direction and upright remain required',async()=>{
+ const f=fixture();f.session.analysisMetadata=JSON.parse(readFileSync(new URL('./fixtures/analysis-metadata-v1.json',import.meta.url),'utf8'));
+ const p=await loaded(f,{}),html=renderer({expanded:true}).render(p);
+ assert.equal(p.setup.geometry.status,'persisted-native');assert.match(html,/Partial analysis/);
+ assert.match(html,/Projected 2D knee flexion · available/);assert.match(html,/200 ms requested: 0 degrees; none/);
+ assert.match(html,/One travel direction in image x: required/);assert.match(html,/Explicit upright orientation confirmation: required/);
+ assert.match(html,/NOT_EVALUATED/);
+});
 for(const key of ['direction','upright'])test(`missing ${key} renders a reason without disabling supported knee output`,async()=>{
  const f=fixture();delete f.setup[key];const html=renderer({expanded:true}).render(await loaded(f));
  assert.match(html,/Partial analysis/);assert.match(html,/Projected 2D knee flexion · available/);

@@ -125,8 +125,8 @@ test('empty interval summaries keep null mean and insufficient-evidence status',
  assert.equal(p.components.intervals.details.polarities[0].summary.count,0);
 });
 test('versions and requested-clock provenance are preserved; evidence remains unavailable',async()=>{
- const p=present((await loaded()).getState());assert.equal(p.contractVersion,'saved-analysis-presentation-1');
- assert.equal(p.provenance.adapterVersion,'saved-payload-analysis-1');assert.equal(p.provenance.analysisVersion,'session-analysis-1');
+ const p=present((await loaded()).getState());assert.equal(p.contractVersion,'saved-analysis-presentation-2');
+ assert.equal(p.provenance.adapterVersion,'saved-payload-analysis-2');assert.equal(p.provenance.analysisVersion,'session-analysis-2');
  assert.equal(p.components.knee.details.algorithmVersion,'projected-knee-1');assert.equal(p.components.motion.details.algorithmVersion,'ankle-motion-extrema-1');
  assert.equal(p.components.intervals.details.algorithmVersion,'candidate-motion-interval-1');
  assert.equal(p.provenance.extractorVersion,'android-pose-0.1.1');assert.equal(p.provenance.modelSha256,'a'.repeat(64));

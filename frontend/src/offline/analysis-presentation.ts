@@ -1,6 +1,6 @@
 import type {SavedSessionLoadState} from './saved-session-loader.ts';
 
-export const ANALYSIS_PRESENTATION_VERSION = 'saved-analysis-presentation-1';
+export const ANALYSIS_PRESENTATION_VERSION = 'saved-analysis-presentation-2';
 export type PresentationStatus = 'unselected' | 'loading' | 'load-failed' | 'invalid-data'
   | 'processing-failed' | 'unavailable' | 'partial' | 'calculated';
 export type ReadonlyDeep<T> = T extends readonly (infer U)[] ? readonly ReadonlyDeep<U>[] :
@@ -43,6 +43,7 @@ export function presentSavedAnalysis(state: SavedSessionLoadState) {
     status === 'invalid-data' ? 'rejected' : current ? 'loaded' : 'not-loaded';
   const assessed = !!current && current.processing?.status === 'completed';
   const geometrySupplied = knee?.geometry?.source === 'caller-asserted-inference-dimensions';
+  const geometryPersisted = knee?.geometry?.source === 'native-inference-bitmap';
   const labels = {
     unselected: 'No session selected', loading: 'Loading saved session',
     'load-failed': 'Saved-session read failed', 'invalid-data': 'Saved data or setup could not be accepted',
@@ -67,9 +68,9 @@ export function presentSavedAnalysis(state: SavedSessionLoadState) {
         status: components?.intervals.status ?? 'not-analyzed', reasons: components?.intervals.reasons ?? [], details: intervals},
     },
     setup: {
-      geometry: {affects: ['knee'], status: !assessed ? 'not-assessed' : geometrySupplied ? 'caller-asserted' : 'required',
+      geometry: {affects: ['knee'], status: !assessed ? 'not-assessed' : geometryPersisted ? 'persisted-native' : geometrySupplied ? 'caller-asserted' : 'required',
         requirement: 'Explicit inference dimensions valid throughout this session',
-        value: geometrySupplied ? knee?.geometry ?? null : null},
+        value: geometrySupplied || geometryPersisted ? knee?.geometry ?? null : null},
       direction: {affects: ['motion', 'intervals'], status: !assessed ? 'not-assessed' :
         context?.direction === 1 || context?.direction === -1 ? 'caller-asserted' : 'required',
         requirement: 'One travel direction in image x', value: context?.direction ?? null},

@@ -4,11 +4,11 @@ import {detectMotionCandidates} from './motion-candidates.ts';
 import {calculateCandidateMotionIntervals} from './motion-intervals.ts';
 import type {Session} from './contract.ts';
 import type {MotionResult} from './motion-candidates.ts';
-import type {ExplicitKneeGeometry} from './knee-flexion.ts';
+import type {KneeGeometryInput} from './knee-flexion.ts';
 
-export const SESSION_ANALYSIS_VERSION='session-analysis-1';
+export const SESSION_ANALYSIS_VERSION='session-analysis-2';
 export type AnalysisRequest={session:unknown;frames:unknown;
- geometry?:ExplicitKneeGeometry|null;
+ geometry?:KneeGeometryInput|null;
  context:{sessionId:string;participantId:string|null;attemptId:string|null;view:string;side:'left'|'right';
  direction:1|-1|null;upright:boolean;continuity:'detector-segments'|'unknown'};
  processing:{status:'completed'|'failed';reason:string|null}};

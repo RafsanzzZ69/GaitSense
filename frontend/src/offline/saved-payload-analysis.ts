@@ -1,9 +1,11 @@
 import {parseSession} from './contract.ts';
 import type {Session, PoseFrame} from './contract.ts';
-import type {ExplicitKneeGeometry} from './knee-flexion.ts';
+import type {ExplicitKneeGeometry, KneeGeometryInput} from './knee-flexion.ts';
+import {readAnalysisMetadata} from './analysis-metadata.ts';
+import type {GeometryUnavailableReason} from './analysis-metadata.ts';
 import {analyzeSavedSession} from './session-analysis.ts';
 
-export const SAVED_PAYLOAD_ADAPTER_VERSION = 'saved-payload-analysis-1';
+export const SAVED_PAYLOAD_ADAPTER_VERSION = 'saved-payload-analysis-2';
 export type BoundSavedRead = {sessionId: string} & (
   {status: 'loaded'; payload: string} | {status: 'failed'; reason: string});
 export type SavedAnalysisSetup = {
@@ -86,8 +88,25 @@ export function analyzeSavedPayload(request: unknown) {
   // Geometry is validated by the knee engine and never falls back to diagnostics.
   // Copy only recognized geometry fields; arbitrary extras cannot establish evidence.
   const g = setup.geometry;
-  const geometry = object(g) ? {inferenceWidth: g.inferenceWidth, inferenceHeight: g.inferenceHeight,
+  let geometry: KneeGeometryInput | null = object(g) ? {inferenceWidth: g.inferenceWidth, inferenceHeight: g.inferenceHeight,
     source: g.source, assumption: g.assumption} as ExplicitKneeGeometry : null;
+  const metadata = readAnalysisMetadata(session.analysisMetadata);
+  const unavailableGeometry = (reason: GeometryUnavailableReason): KneeGeometryInput => ({source:'unavailable-explicit-geometry',reason});
+  if (metadata.status === 'unavailable') geometry=unavailableGeometry(metadata.reason);
+  if (metadata.status === 'recognized') {
+    const stored=metadata.metadata.geometry;
+    if (stored.observedInferenceCalls < session.poseFrames || stored.observedInferenceCalls > session.sampledFrames)
+      geometry=unavailableGeometry('invalid_analysis_metadata');
+    else if (stored.status === 'unavailable') geometry=unavailableGeometry(stored.reason === 'no-inference-calls'?'no_inference_calls':'varying_inference_dimensions');
+    else if (g !== undefined && g !== null && (!object(g)
+      || g.source !== 'caller-asserted-inference-dimensions' || g.assumption !== 'constant-inference-dimensions-within-session'
+      || g.inferenceWidth !== stored.inferenceWidth || g.inferenceHeight !== stored.inferenceHeight))
+      geometry=unavailableGeometry('geometry_conflict');
+    else {
+      const {status: _availability, ...nativeGeometry}=stored;
+      geometry=nativeGeometry;
+    }
+  }
   const typedSetup = setup as SavedAnalysisSetup;
   const analysis = analyzeSavedSession({session, frames: frames as PoseFrame[], geometry,
     context: {sessionId: session.id, view: session.view, side: session.view === 'side_left' ? 'left' : 'right',
@@ -100,7 +119,9 @@ export function analyzeSavedPayload(request: unknown) {
       framesReadId: framesRead.sessionId, verification: 'caller-bound-ids-only' as const},
     counts: {sampled: session.sampledFrames, declaredPoses: session.poseFrames, loaded: loadedCount,
       omittedAtExtraction: session.sampledFrames - loadedCount},
-    setupProvenance: {geometry: geometry ? 'caller-supplied' : 'not-supplied',
+    metadataAssessment: metadata,
+    setupProvenance: {geometry: geometry?.source === 'native-inference-bitmap' ? 'persisted-native'
+      : geometry?.source === 'unavailable-explicit-geometry' ? geometry.reason : geometry ? 'caller-supplied' : 'not-supplied',
       direction: typedSetup.direction == null ? 'not-supplied' : 'caller-asserted',
       upright: typedSetup.upright === true ? 'caller-asserted' : 'not-confirmed',
       ownership: 'caller-supplied-or-null', continuity: typedSetup.continuity ?? 'unknown'},

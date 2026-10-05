@@ -1,6 +1,8 @@
 export type CapturePhase = 'ready' | 'countdown' | 'recording' | 'preview' | 'processing';
 export type SideView = 'side_left' | 'side_right';
 export type Session = {
+  // Optional additive JSON; analysis validates it separately from History metadata.
+  analysisMetadata?: unknown;
   diagnostics?: string;
   id: string; createdAt: number; durationMs: number; sampledFrames: number;
   poseFrames: number; usableFrameRatio: number; landmarkCount: number;

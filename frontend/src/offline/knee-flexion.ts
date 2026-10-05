@@ -1,5 +1,7 @@
 import { parseSession } from './contract.ts';
 import type { Landmark, PoseFrame, Session, SideView } from './contract.ts';
+import {isNativeInferenceGeometry} from './analysis-metadata.ts';
+import type {NativeInferenceGeometry, GeometryUnavailableReason} from './analysis-metadata.ts';
 
 /** Computational estimates only; no anatomical/clinical validation is implied. */
 export const KNEE_CONFIGURATION = Object.freeze({
@@ -11,14 +13,16 @@ export type KneeReason = 'invalid_session' | 'invalid_frames' | 'unsupported_vie
   | 'decreasing_timestamp' | 'frame_count_mismatch' | 'no_observations'
   | 'missing_geometry' | 'non_finite_coordinate' | 'invalid_confidence'
   | 'low_visibility' | 'low_presence' | 'out_of_frame' | 'degenerate_geometry'
-  | 'missing_observations' | 'timestamp_gap' | 'irregular_sampling';
+  | 'missing_observations' | 'timestamp_gap' | 'irregular_sampling' | GeometryUnavailableReason;
 export type TimeRange = { startMs: number; endMs: number };
 export type ExplicitKneeGeometry = {
   inferenceWidth: number; inferenceHeight: number;
   source: 'caller-asserted-inference-dimensions';
   assumption: 'constant-inference-dimensions-within-session';
 };
-export type KneeGeometry = (ExplicitKneeGeometry & {aspectRatio: number}) | {
+export type KneeGeometryInput = ExplicitKneeGeometry | NativeInferenceGeometry |
+  {source:'unavailable-explicit-geometry'; reason:GeometryUnavailableReason};
+export type KneeGeometry = ((ExplicitKneeGeometry | NativeInferenceGeometry) & {aspectRatio: number}) | {
   decodedWidth: number; decodedHeight: number; decodedAspectRatio: number;
   inferenceWidth: number; inferenceHeight: number; aspectRatio: number;
   source: 'android-pose-0.1.1-diagnostics';
@@ -108,7 +112,7 @@ function flexion(hip: Landmark, knee: Landmark, ankle: Landmark, aspect: number)
  * Structural corruption fails the whole request; numeric quality fails per sample.
  */
 export function analyzeKneeFlexion(sessionInput: unknown, framesInput: unknown,
-  geometryInput?: ExplicitKneeGeometry | null): KneeResult {
+  geometryInput?: KneeGeometryInput | null): KneeResult {
   const result: KneeResult = {
     feature: 'selected-side-2d-projected-knee-flexion', units: 'degrees',
     algorithmVersion: 'projected-knee-1', configuration: KNEE_CONFIGURATION,
@@ -157,6 +161,7 @@ export function analyzeKneeFlexion(sessionInput: unknown, framesInput: unknown,
   const frames = framesInput as PoseFrame[];
   // Undefined preserves the legacy API. Explicit null forbids diagnostic fallback.
   result.geometry = geometryInput === undefined ? legacyKneeGeometry(session) :
+    isNativeInferenceGeometry(geometryInput) ? {...geometryInput,transform:{...geometryInput.transform},aspectRatio:geometryInput.inferenceWidth / geometryInput.inferenceHeight} :
     object(geometryInput) && geometryInput.source === 'caller-asserted-inference-dimensions' &&
     geometryInput.assumption === 'constant-inference-dimensions-within-session' &&
     Number.isSafeInteger(geometryInput.inferenceWidth) && geometryInput.inferenceWidth > 0 &&
@@ -166,7 +171,10 @@ export function analyzeKneeFlexion(sessionInput: unknown, framesInput: unknown,
   result.quality.missingObservationCount = session.sampledFrames - frames.length;
   result.timeRange = { startMs: frames[0].timestampMs, endMs: frames[frames.length - 1].timestampMs };
   const indices = session.view === 'side_left' ? [23, 25, 27] : [24, 26, 28];
-  if (!result.geometry) result.reasons.push('missing_geometry');
+  const geometryReason: KneeReason = geometryInput?.source === 'unavailable-explicit-geometry'
+    && ['geometry_conflict','invalid_analysis_metadata','unsupported_analysis_metadata_version','varying_inference_dimensions','no_inference_calls'].includes(geometryInput.reason)
+    ? geometryInput.reason : 'missing_geometry';
+  if (!result.geometry) result.reasons.push(geometryReason);
   if (result.quality.missingObservationCount > 0) result.reasons.push('missing_observations');
   let segment: KneeResult['segments'][number] | undefined;
   frames.forEach((frame, n) => {
@@ -180,7 +188,7 @@ export function analyzeKneeFlexion(sessionInput: unknown, framesInput: unknown,
     const landmarkQuality = points.map(quality);
     const reasons = unique(landmarkQuality.flatMap(q => q.reasons));
     let value: number | null = null;
-    if (!result.geometry) reasons.push('missing_geometry');
+    if (!result.geometry) reasons.push(geometryReason);
     if (!reasons.length && result.geometry) {
       value = flexion(points[0], points[1], points[2], result.geometry.aspectRatio);
       if (value === null) reasons.push('degenerate_geometry');

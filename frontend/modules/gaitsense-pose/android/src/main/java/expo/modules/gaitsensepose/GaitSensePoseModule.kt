@@ -175,6 +175,7 @@ internal class OfflinePoseProcessor(
       val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
       var decodedSize = "unknown"
       val diagnostics = PoseSampleDiagnostics()
+      val analysisMetadata = InferenceAnalysisMetadata()
       val options = PoseLandmarker.PoseLandmarkerOptions.builder()
         .setBaseOptions(BaseOptions.builder().setModelAssetPath(MODEL).build())
         .setRunningMode(RunningMode.VIDEO).setNumPoses(2)
@@ -198,6 +199,7 @@ internal class OfflinePoseProcessor(
             try {
               val image = BitmapImageBuilder(bitmap).build()
               try {
+                analysisMetadata.observe(bitmap.width, bitmap.height)
                 val poses = detector.detectForVideo(image, timestamp).landmarks()
                 diagnostics.observe(timestamp, poses.map { points -> points.map { p ->
                   DiagnosticPoint(p.x(), p.y(), p.visibility().orElse(0f), p.presence().orElse(0f))
@@ -238,6 +240,7 @@ internal class OfflinePoseProcessor(
         .put("durationMs", duration).put("sampledFrames", sampled).put("poseFrames", frames.size)
         .put("usableFrameRatio", ratio).put("view", view).put("modelSha256", hash)
         .put("diagnostics", diagnosticText)
+        .put("analysisMetadata", analysisMetadata.toJson())
         .put("extractorVersion", "android-pose-0.1.1").put("landmarkCount", 33)
         .put("rawVideoRetained", false).put("consentVersion", "local-prototype-notice-v1")
         .put("timestampMethod", "requested-100ms-nearest-decoded-frame")
