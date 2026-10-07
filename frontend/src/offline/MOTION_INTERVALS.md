@@ -200,8 +200,9 @@ Synthetic v2 adapter cases with explicitly requested, checked detector continuit
 produce 11 intervals per polarity, each 800 ms, for either direction and matching or
 absent caller assertions. Unknown continuity still excludes those same pairs.
 
-The production History action continues to supply no continuity request; this task
-does not change that policy or the UI. Actual PTS, exact-image evidence and physical
+At Task 6 completion the production History action supplied no continuity request;
+Task 8 subsequently adds a request for freshly checked segments after auditing the
+existing evidence (`SAVED_CONTINUITY.md`). Actual PTS, exact-image evidence and physical
 cycle completeness remain unavailable/unknown. Recommend a selective source checkpoint
 before a separately authorized release build and phone smoke test of new recording
 setup. No research dataset is needed for that engineering acceptance test.

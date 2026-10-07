@@ -82,8 +82,9 @@ The previous `unsupported_direction_source` guard for operator setup is removed;
 unknown sources still fail closed. Every other interval eligibility gate remains.
 Motion may run
 when setup and real landmark/signal requirements permit; it may still be unavailable,
-partial or insufficient evidence. The History action supplies no continuity or
-participant/attempt ownership. Requested sampling times remain requested times;
+partial or insufficient evidence. Sprint 5 Task 8's History binding requests freshly
+checked detector segments; see `SAVED_CONTINUITY.md`. It supplies no participant/attempt
+ownership. Requested sampling times remain requested times;
 actual decoded-frame PTS and exact-image evidence remain unavailable.
 
 Scientific status remains NOT_EVALUATED. No contact, step/stride, cadence, clinical

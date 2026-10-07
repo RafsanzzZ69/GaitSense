@@ -83,7 +83,7 @@ test('evidence and scientific restrictions remain in visible panel copy',async()
  assert.match(t,/NOT_EVALUATED/);assert.match(t,/Actual decoded-frame PTS unavailable/);assert.match(t,/Exact-image correspondence not established/);
  assert.match(t,/not independently authenticated/);assert.match(t,/not validated step or stride times/);
 });
-test('actual Android route and screen wire tested binding, cleanup and formatter without setup defaults',()=>{
+test('actual Android route and screen wire tested binding, cleanup and formatter without scientific setup defaults',()=>{
  const capture=readFileSync(new URL('../src/offline/OfflineCapture.tsx',import.meta.url),'utf8');
  const panel=readFileSync(new URL('../src/offline/SavedAnalysisPanel.tsx',import.meta.url),'utf8');
  const history=readFileSync(new URL('../src/app/history.android.tsx',import.meta.url),'utf8');
@@ -91,4 +91,75 @@ test('actual Android route and screen wire tested binding, cleanup and formatter
  assert.match(capture,/binding\.dispose\(\)/);assert.match(capture,/analysisBinding\.current\?\.leave\(\)/);
  assert.match(capture,/analysisBinding\.current\?\.select\(s\.id\)/);assert.match(capture,/<SavedAnalysisPanel presentation=\{analysis\}/);
  assert.match(panel,/savedAnalysisPanel\(presentation\)/);assert.doesNotMatch(panel,/Pose\.|deleteSession|deleteAll|fixture/);
+});
+
+function persistedFixture(){
+ const f=fixture();f.session.analysisMetadata=JSON.parse(readFileSync(new URL('./fixtures/analysis-metadata-v2.json',import.meta.url),'utf8'));
+ return f;
+}
+test('History selection requests and uses freshly checked detector segments with persisted setup',async()=>{
+ const f=persistedFixture(),h=harness(f),before=JSON.stringify(f);await h.binding.select('A');const p=h.publications.at(-1);
+ assert.equal(p.components.intervals.status,'available');assert.equal(p.setup.continuity.status,'requested');
+ assert.equal(p.setup.continuity.requested,'detector-segments');assert.equal(p.setup.continuity.used,'detector-segments');
+ assert.equal(p.components.intervals.details.directionSource,'operator-recording-setup');
+ assert.deepEqual(p.components.intervals.details.polarities.map(v=>v.summary.count),[11,11]);
+ assert.ok(p.components.intervals.details.polarities.every(v=>v.intervals.every(i=>i.elapsedMs===800)));
+ assert.equal(p.components.intervals.details.physicalCycleCompleteness,'unknown');
+ assert.equal(p.components.intervals.details.timestampProvenance.actualDecodedFrameTimes,false);
+ assert.equal(p.provenance.actualDecodedFramePts,'not-available');assert.equal(p.provenance.exactImageCorrespondence,'not-established');
+ assert.equal(p.provenance.frameOwnership,'not-independently-authenticated');assert.equal(p.scientificStatus,'NOT_EVALUATED');
+ assert.equal(JSON.stringify(f),before);assert.deepEqual(h.calls,['list','A']);
+ assert.match(text(p),/800 milliseconds/);assert.match(text(p),/not validated step or stride times/);
+});
+for(const continuity of ['unknown',undefined])test(`explicit caller setup keeps ${continuity} continuity unavailable`,async()=>{
+ const h=harness(persistedFixture());await h.binding.select('A',continuity===undefined?{}:{continuity});const p=h.publications.at(-1);
+ assert.equal(p.setup.continuity.used,'unknown');assert.equal(p.components.intervals.status,'unavailable');
+ assert.ok(p.components.intervals.reasons.includes('continuity_unknown'));
+ assert.ok(p.components.intervals.details.polarities.every(v=>v.summary.meanMs===null));
+});
+for(const cause of ['omitted-pose','low-confidence'])test(`History ${cause} splits segments and blocks crossing intervals`,async()=>{
+ const f=persistedFixture();
+ if(cause==='omitted-pose'){f.frames=f.frames.filter(v=>v.timestampMs!==1200);f.session.poseFrames=99;}
+ else f.frames[12].landmarks[23].visibility=.1;
+ const h=harness(f);await h.binding.select('A');const p=h.publications.at(-1),m=p.components.motion.details,i=p.components.intervals.details;
+ assert.equal(p.setup.continuity.used,'detector-segments');assert.equal(m.segments.length,2);
+ assert.equal(p.components.intervals.status,'partial');
+ assert.ok(i.polarities.every(v=>v.intervals[0].elapsedMs===null&&v.intervals[0].reasons.includes('segment_mismatch')));
+ assert.ok(i.polarities.every(v=>v.intervals.slice(1).every(i=>i.elapsedMs===800)));
+ if(cause==='omitted-pose'){
+  assert.deepEqual(i.gaps,[{afterMs:1100,beforeMs:1300}]);
+  assert.ok(i.polarities.every(v=>v.intervals[0].reasons.includes('known_gap')));
+ }else {assert.equal(m.observations[12].value,null);assert.ok(m.observations[12].reasons.includes('low_visibility'));}
+});
+test('History request cannot bypass insufficient extrema or missing historical assertions',async()=>{
+ const f=persistedFixture();f.frames.forEach(v=>v.landmarks[27].x=.5);const h=harness(f);await h.binding.select('A');
+ let p=h.publications.at(-1);assert.equal(p.components.intervals.status,'unavailable');
+ assert.ok(p.components.intervals.details.polarities.every(v=>v.summary.count===0&&v.summary.meanMs===null));
+ const old=fixture();old.session.analysisMetadata=JSON.parse(readFileSync(new URL('./fixtures/analysis-metadata-v1.json',import.meta.url),'utf8'));
+ const legacy=harness(old);await legacy.binding.select('A');p=legacy.publications.at(-1);
+ assert.equal(p.components.knee.status,'available');assert.equal(p.components.motion.status,'unavailable');
+ assert.equal(p.components.intervals.status,'unavailable');assert.equal(p.setup.direction.status,'required');assert.equal(p.setup.upright.status,'required');
+});
+test('explicit caller direction and checked continuity retain caller provenance',async()=>{
+ const f=fixture(),h=harness(f);await h.binding.select('A',f.setup);const p=h.publications.at(-1);
+ assert.equal(p.components.intervals.status,'available');assert.equal(p.components.intervals.details.directionSource,'caller-asserted');
+ assert.equal(p.setup.continuity.used,'detector-segments');
+});
+test('direction disagreement still blocks motion and intervals while knee survives',async()=>{
+ const h=harness(persistedFixture());await h.binding.select('A',{direction:-1,continuity:'detector-segments'});const p=h.publications.at(-1);
+ assert.equal(p.components.knee.status,'available');assert.deepEqual(p.components.motion.reasons,['direction_conflict']);
+ assert.deepEqual(p.components.intervals.reasons,['motion_setup_unavailable','direction_conflict']);assert.equal(p.components.intervals.details,null);
+ assert.equal(p.setup.continuity.used,null);
+});
+test('History does not pair unlike polarities when only two extrema have support',async()=>{
+ const f=persistedFixture();f.frames=f.frames.filter(v=>v.timestampMs>=300&&v.timestampMs<=1700);f.session.poseFrames=f.frames.length;
+ const h=harness(f);await h.binding.select('A');const p=h.publications.at(-1);
+ assert.deepEqual(p.components.motion.details.candidates.map(c=>c.timestampMs),[800,1200]);
+ assert.equal(p.components.intervals.status,'unavailable');
+ assert.ok(p.components.intervals.details.polarities.every(v=>v.intervals.length===0&&v.summary.meanMs===null));
+});
+test('History side selection uses that side signal, never candidates from the other ankle',async()=>{
+ const f=persistedFixture();f.session.view='side_right';const h=harness(f);await h.binding.select('A');const p=h.publications.at(-1);
+ assert.equal(p.components.motion.details.side,'right');assert.deepEqual(p.components.motion.details.candidates,[]);
+ assert.equal(p.components.intervals.status,'unavailable');
 });

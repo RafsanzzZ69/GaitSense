@@ -18,7 +18,10 @@ export function createSavedAnalysisBinding(reads: SavedSessionReads, publish: (p
   return {
     async select(id: string, setup?: SavedAnalysisSetup) {
       if (disposed) return;
-      const pending = loader.select(id, setup);
+      // Request fresh detector evidence, never assert continuous capture. The wrapper
+      // checks usable segments/gaps from the validated saved frames before using it.
+      // Explicit caller setup (including unknown continuity) keeps its existing policy.
+      const pending = loader.select(id, setup === undefined ? {continuity:'detector-segments'} : setup);
       emit();
       await pending;
       emit();

@@ -13,12 +13,18 @@ which calls the existing coordinator with injected `Pose.listSessions` and
 `Pose.readFrames`. Results appear in a separate, explicitly session-labelled panel
 above History. `Close saved analysis` clears only the analysis selection.
 
-The production button calls `select(id)` without caller setup. Sprint 5 persists
+The production button calls `select(id)` without caller scientific setup. Sprint 5 persists
 native inference geometry and explicit operator recording-time direction/upright
 assertions for new sessions; see `RECORDING_ANALYSIS_SETUP.md`. Camera-side selection,
 phone-orientation instructions and preview layout points never supply those assertions.
 Historical sessions retain their original missing setup. Supported components may run
 independently, while absent/conflicting setup stays explicit. No fixture data enters production.
+
+Sprint 5 Task 8's binding requests freshly checked detector segments for that no-setup
+History call. The wrapper establishes usable requested-clock segments from validated
+frames; the request never asserts uninterrupted video capture. Explicit caller setup
+is unchanged, including unknown continuity. See `SAVED_CONTINUITY.md` for the audit,
+native storage assignment, quality/omission boundaries and provenance limitations.
 
 ## Lifecycle and display
 
