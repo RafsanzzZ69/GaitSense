@@ -3,7 +3,7 @@
 `presentSavedAnalysis(state)` accepts the public `SavedSessionLoadState` from the
 production saved-session loader. The existing adapter/wrapper result is nested in
 that state; do not pass independently merged component results. Contract version:
-`saved-analysis-presentation-2`. This is a pure projection with no IO or new analysis
+`saved-analysis-presentation-3`. This is a pure projection with no IO or new analysis
 mathematics. It returns a detached, deeply frozen snapshot with recursive readonly
 TypeScript types, preserving numerical zero and null as distinct values.
 
@@ -11,7 +11,9 @@ Sprint 5 adds `setup.geometry.status: persisted-native` for geometry observed an
 stored by the inference bitmap path. Its full geometry provenance is retained in
 the component and setup value. Caller geometry remains caller-asserted; conflicts
 remain unavailable with explicit reasons. See `ANALYSIS_METADATA.md` for the versioned
-storage contract. Direction/upright requirements are unchanged.
+storage contract. Version-2 direction/upright assertions additionally report
+`persisted-operator`, `conflict` or `invalid`, retaining resolved values and sources.
+See `RECORDING_ANALYSIS_SETUP.md`; the underlying setup requirements are unchanged.
 
 ## States and component rules
 
@@ -48,10 +50,11 @@ failure envelope, not an invented native failed-attempt record.
 ## Setup and permitted display
 
 Setup requirements are not-assessed until completed analysis exists. Explicit geometry,
-direction and upright assertions are caller-asserted when supported, otherwise required.
+direction and upright assertions are caller-asserted or persisted-operator when supported,
+otherwise required, conflict or invalid.
 Direction and upright requirements are assessed separately so the detector's first-error
 return cannot hide a second missing prerequisite. Geometry is accepted only from the
-explicit caller-inference source; diagnostic free text is neither parsed nor exposed.
+explicit caller-inference or persisted native-bitmap source; diagnostic free text is neither parsed nor exposed.
 Continuity keeps the requested mode separate from the interval engine's used mode.
 Research ownership remains caller-supplied or null; absent ownership is not assigned.
 

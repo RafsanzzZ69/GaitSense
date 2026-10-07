@@ -1,12 +1,15 @@
 # Session analysis result wrapper
 
 `analyzeSavedSession(request)` composes the existing knee, motion and interval exports.
-Contract version: session-analysis-2. Pure TypeScript, no IO, native/UI/database changes
+Contract version: session-analysis-3. Pure TypeScript, no IO, native/UI/database changes
 or external precomputed-result merging. Scientific status is always NOT_EVALUATED.
 
 Sprint 5's structured persistence and geometry precedence are specified in
 `ANALYSIS_METADATA.md`. New summary metadata can supply native inference geometry;
-the saved-payload adapter is now `saved-payload-analysis-2`. The Sprint 4 sections
+the saved-payload adapter is now `saved-payload-analysis-3`. Version-2 operator setup,
+distinct direction/upright conflicts and source limitations are specified in
+`RECORDING_ANALYSIS_SETUP.md`. Conflicts leave knee independent; persisted operator
+direction is not relabeled to satisfy the frozen interval contract. The Sprint 4 sections
 below describe the historical caller-only path, which remains supported for old
 sessions. The saved adapter never parses diagnostic strings as geometry.
 

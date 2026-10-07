@@ -19,7 +19,7 @@ internal class InferenceAnalysisMetadata {
     calls++
   }
 
-  fun toJson(): JSONObject {
+  fun toJson(setup: RecordingAnalysisSetup? = null): JSONObject {
     val geometry = JSONObject().put("observedInferenceCalls", calls)
     if (calls > 0 && consistent) {
       geometry.put("status", "available").put("source", "native-inference-bitmap")
@@ -33,7 +33,7 @@ internal class InferenceAnalysisMetadata {
         .put("reason", if (calls == 0) "no-inference-calls" else "varying-inference-dimensions")
     }
     fun unassessed() = JSONObject().put("status", "unassessed").put("value", JSONObject.NULL).put("source", JSONObject.NULL)
-    return JSONObject().put("contractVersion", "saved-analysis-metadata-1").put("geometry", geometry)
-      .put("direction", unassessed()).put("upright", unassessed())
+    return JSONObject().put("contractVersion", if (setup == null) "saved-analysis-metadata-1" else "saved-analysis-metadata-2").put("geometry", geometry)
+      .put("direction", setup?.directionJson() ?: unassessed()).put("upright", setup?.uprightJson() ?: unassessed())
   }
 }

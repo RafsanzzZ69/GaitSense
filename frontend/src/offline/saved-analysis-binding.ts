@@ -38,6 +38,10 @@ export function savedAnalysisPanel(p: SavedAnalysisPresentation) {
   const groups: {title: string; lines: string[]; expandable?: boolean}[] = [];
   groups.push({title: 'Analysis setup', lines: [
     ...[p.setup.geometry,p.setup.direction,p.setup.upright,p.setup.continuity].map(s=>`${s.requirement}: ${s.status}`),
+    ...(p.setup.direction.status==='persisted-operator' ?
+      [`Operator recording setup: movement toward image ${p.setup.direction.value===1?'right':'left'}.`] : []),
+    ...(p.setup.upright.status==='persisted-operator' ?
+      ['Operator recording setup: upright image orientation confirmed. This is an assertion, not scientific validation.'] : []),
     ...[p.setup.geometry,p.setup.direction,p.setup.upright].some(s=>s.status==='required') ?
       ['Saved metadata does not establish the missing setup. Diagnostic text and camera-side selection cannot supply it.'] : [],
   ]});

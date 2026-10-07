@@ -6,11 +6,12 @@ import type {Session} from './contract.ts';
 import type {MotionResult} from './motion-candidates.ts';
 import type {KneeGeometryInput} from './knee-flexion.ts';
 
-export const SESSION_ANALYSIS_VERSION='session-analysis-2';
+export const SESSION_ANALYSIS_VERSION='session-analysis-3';
 export type AnalysisRequest={session:unknown;frames:unknown;
  geometry?:KneeGeometryInput|null;
+ setupConflicts?: ('direction_conflict'|'upright_conflict'|'invalid_persisted_setup')[];
  context:{sessionId:string;participantId:string|null;attemptId:string|null;view:string;side:'left'|'right';
- direction:1|-1|null;upright:boolean;continuity:'detector-segments'|'unknown'};
+ direction:1|-1|null;upright:boolean;directionSource?:'caller-asserted'|'operator-recording-setup';continuity:'detector-segments'|'unknown'};
  processing:{status:'completed'|'failed';reason:string|null}};
 type Failure={status:'unavailable';reasons:string[];result:null};
 function unavailable(...reasons:string[]):Failure{return {status:'unavailable',reasons,result:null};}
@@ -34,6 +35,9 @@ export function analyzeSavedSession(request:AnalysisRequest){
  if(ctx.view!==session.view||ctx.side!==(session.view==='side_left'?'left':'right'))reasons.push('view_side_mismatch');
  if(!ownerId(ctx.participantId)||!ownerId(ctx.attemptId))reasons.push('invalid_ownership');
  if(!['detector-segments','unknown'].includes(ctx.continuity))reasons.push('invalid_continuity_request');
+ if(ctx.directionSource !== undefined && !['caller-asserted','operator-recording-setup'].includes(ctx.directionSource))reasons.push('invalid_direction_source');
+ if(request.setupConflicts !== undefined && (!Array.isArray(request.setupConflicts) ||
+   request.setupConflicts.some(r=>!['direction_conflict','upright_conflict','invalid_persisted_setup'].includes(r))))reasons.push('invalid_setup_conflicts');
  if(reasons.length)return fail('incompatible',reasons,session);
  if(p.status==='failed'&&typeof p.reason==='string'&&p.reason.trim())return fail('failed',['processing_failed',p.reason],session);
  if(p.status!=='completed'||p.reason!==null)return fail('incompatible',['invalid_processing_state'],session);
@@ -41,14 +45,18 @@ export function analyzeSavedSession(request:AnalysisRequest){
  if(!Array.isArray(request.frames)||Array.from({length:request.frames.length},(_,i)=>i).some(i=>!Object.hasOwn(request.frames as object,i)))
   return fail('incompatible',['invalid_frames'],session);
  const knee=analyzeKneeFlexion(session,request.frames,request.geometry);
- const motion=detectMotionCandidates(session,request.frames,{direction:ctx.direction as 1|-1,upright:ctx.upright as true});
+ const conflicts=request.setupConflicts ?? [];
+ const motion=conflicts.length ? null : detectMotionCandidates(session,request.frames,{direction:ctx.direction as 1|-1,upright:ctx.upright as true});
  const kneeComponent={status:knee.status,reasons:[...knee.reasons],result:knee};
- const motionComponent={status:motion.status,reasons:[...motion.reasons],result:motion};
- const continuity=ctx.continuity==='detector-segments'&&verifiedContinuity(motion)?'detector-segments':'unknown';
+ const motionComponent=motion ? {status:motion.status,reasons:[...motion.reasons],result:motion} : unavailable(...conflicts);
+ const continuity=motion && ctx.continuity==='detector-segments'&&verifiedContinuity(motion)?'detector-segments':'unknown';
  // Session IDs in the existing Session contract are arbitrary strings; interval ownership uses a
  // restricted identifier grammar. Never rename or encode one silently to manufacture compatibility.
  let intervals:Failure|{status:string;reasons:string[];result:ReturnType<typeof calculateCandidateMotionIntervals>};
- if(!ownerId(session.id))intervals=unavailable('interval_session_id_incompatible');
+ if(!motion)intervals=unavailable('motion_setup_unavailable',...conflicts);
+ // The frozen interval contract accepts caller assertions only. Do not relabel stored operator evidence.
+ else if(ctx.directionSource==='operator-recording-setup')intervals=unavailable('unsupported_direction_source');
+ else if(!ownerId(session.id))intervals=unavailable('interval_session_id_incompatible');
  else {
   const result=calculateCandidateMotionIntervals({schemaVersion:'candidate-motion-interval-input-1',
    sourceAlgorithmVersion:motion.algorithmVersion,sourceConfigurationVersion:motion.configuration.version,

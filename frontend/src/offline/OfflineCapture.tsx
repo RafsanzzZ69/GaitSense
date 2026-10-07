@@ -11,6 +11,8 @@ import type { CapturePhase, PoseFrame, Session, SideView } from './contract';
 import { createSavedAnalysisBinding } from './saved-analysis-binding';
 import type { SavedAnalysisPresentation } from './analysis-presentation';
 import { SavedAnalysisPanel } from './SavedAnalysisPanel';
+import { RecordingAnalysisSetupControls } from './RecordingAnalysisSetupControls';
+import { createRecordingSetupBinding, serializeRecordingSetup } from './recording-analysis-setup';
 
 function Preview({ uri, size }: {uri: string; size: {width:number; height:number}}) {
   const player = useVideoPlayer(uri);
@@ -28,6 +30,10 @@ export default function OfflineCapture() {
   const [consent,setConsent] = useState(false);
   const [ready,setReady] = useState(false);
   const [view,setView] = useState<SideView>('side_left');
+  const [direction,setDirection] = useState<1|-1|null>(null);
+  const [upright,setUpright] = useState(false);
+  const recordingSetup = useRef(createRecordingSetupBinding());
+  const resetSetup = () => {recordingSetup.current.clear(); if(mounted.current){setDirection(null);setUpright(false);}};
   const [uri,setUri] = useState<string|null>(null);
   const [seconds,setSeconds] = useState(0);
   const [countdown,setCountdown] = useState(3);
@@ -76,6 +82,7 @@ export default function OfflineCapture() {
     });
     return ()=>{
       mounted.current=false; interrupted.current=true;
+      recordingSetup.current.clear();
       camera.current?.stopRecording(); Pose?.cancel();
       progressSub?.remove(); stateSub.remove();
       const pending=uriRef.current;
@@ -90,13 +97,14 @@ export default function OfflineCapture() {
   const discard=async()=>{
     if(!Pose || locked.current) return;
     locked.current=true;
-    try { if(uriRef.current) await Pose.discardVideo(uriRef.current); storeUri(null); setPhase('ready'); setReady(false); setError(''); }
+    try { if(uriRef.current) await Pose.discardVideo(uriRef.current); storeUri(null); resetSetup(); setPhase('ready'); setReady(false); setError(''); }
     catch(e){reportError(e);} finally {locked.current=false;}
   };
   const record=async()=>{
     if(!canRecord(phase,consent,ready,!!Pose) || locked.current) return;
     locked.current=true; interrupted.current=false; setError(''); setPhase('countdown');
     try {
+      recordingSetup.current.start(view,direction,upright);
       for(let i=3;i>0;i--) {
         if(interrupted.current || !mounted.current) return;
         setCountdown(i); await new Promise(resolve=>setTimeout(resolve,1000));
@@ -108,14 +116,16 @@ export default function OfflineCapture() {
       if(interrupted.current || !mounted.current) { await Pose!.discardVideo(clip.uri); return; }
       storeUri(clip.uri); setReady(false); setPhase('preview');
     } catch(e){reportError(e);}
-    finally { locked.current=false; if(mounted.current && !uriRef.current) setPhase('ready'); }
+    finally { locked.current=false; if(!uriRef.current) {resetSetup(); if(mounted.current) setPhase('ready');} }
   };
   const process=async()=>{
     if(!Pose || !canProcess(phase,uri,consent) || locked.current) return;
     locked.current=true; interrupted.current=false; setError(''); setProgress(0); setFrames([]); setPhase('processing');
     const source=uri!;
     try {
-      const result=parseSession(await Pose.processVideo(source,view,consent));
+      const setup=recordingSetup.current.get();
+      if(!setup) throw new Error('Recording setup snapshot is unavailable. Discard and retake.');
+      const result=parseSession(await Pose.processVideoWithSetup(source,setup.view,consent,serializeRecordingSetup(setup)));
       storeUri(null);
       const stored=parseFrames(await Pose.readFrames(result.id));
       if(mounted.current){setFrames(stored);setFrameIndex(0);}
@@ -125,6 +135,7 @@ export default function OfflineCapture() {
       // A failed/cancelled attempt is not silently retained as a retry video.
       try { await Pose.discardVideo(source); storeUri(null); }
       catch(e){reportError(e);}
+      if(!uriRef.current) resetSetup();
       locked.current=false;
       if(mounted.current){setReady(false);setPhase(uriRef.current?'preview':'ready');}
     }
@@ -144,6 +155,7 @@ export default function OfflineCapture() {
       </View>
       <Text style={styles.heading}>Setup</Text><Text style={styles.text}>Use a steady phone, clear level path and even light. Keep one person's entire body visible from the side. Walk comfortably; stop if uncomfortable. Record 10–15 seconds. A three-second countdown precedes recording.</Text>
       <View style={styles.row}>{(['side_left','side_right'] as SideView[]).map(side=><Action key={side} label={view===side?`✓ ${side}`:side} disabled={active||!!uri} onPress={()=>setView(side)}/>)}</View>
+      <RecordingAnalysisSetupControls direction={direction} upright={upright} disabled={active||!!uri} onDirection={setDirection} onUpright={setUpright}/>
       {!permission?.granted ? <Action label="Allow camera (no microphone)" onPress={()=>void requestPermission().catch(reportError)}/> : <>
         {uri && phase==='preview' ? <Preview uri={uri} size={previewSize}/> : phase!=='processing' && <CameraView key={cameraKey} ref={camera} style={[styles.camera,previewSize]} ratio="16:9" facing="back" mode="video" mute videoQuality="720p" onCameraReady={()=>setReady(true)} onMountError={e=>{setReady(false);setError(e.message);}}/>}
         <Text style={styles.text}>Hold upright. Keep head and feet inside the live image throughout the walk; leave space around the body. Preview {previewSize.width} × {previewSize.height} layout points; capture requests 720p. Black bars are outside the image.</Text>
@@ -172,7 +184,7 @@ const styles=StyleSheet.create({
   heading:{fontSize:18,fontWeight:'700',color:'#16352e'},text:{fontSize:16,lineHeight:24,color:'#344b45'},
   notice:{backgroundColor:'white',padding:16,borderRadius:14,gap:12},choice:{paddingVertical:12},
   camera:{alignSelf:'center',backgroundColor:'#142b34'},
-  button:{backgroundColor:'#126b57',padding:15,borderRadius:10,alignItems:'center'},
+  button:{backgroundColor:'#126b57',minHeight:48,padding:15,borderRadius:10,alignItems:'center'},
   buttonText:{color:'white',fontSize:16,fontWeight:'600'},disabled:{opacity:.4},row:{flexDirection:'row',flexWrap:'wrap',gap:10},
   error:{color:'#a02020',fontSize:16,lineHeight:24},plot:{height:300,backgroundColor:'#102d27',overflow:'hidden',borderRadius:10},
   dot:{position:'absolute',width:6,height:6,borderRadius:3,backgroundColor:'#8cffc6',marginLeft:-3,marginTop:-3},

@@ -1,6 +1,6 @@
 import type {SavedSessionLoadState} from './saved-session-loader.ts';
 
-export const ANALYSIS_PRESENTATION_VERSION = 'saved-analysis-presentation-2';
+export const ANALYSIS_PRESENTATION_VERSION = 'saved-analysis-presentation-3';
 export type PresentationStatus = 'unselected' | 'loading' | 'load-failed' | 'invalid-data'
   | 'processing-failed' | 'unavailable' | 'partial' | 'calculated';
 export type ReadonlyDeep<T> = T extends readonly (infer U)[] ? readonly ReadonlyDeep<U>[] :
@@ -44,6 +44,13 @@ export function presentSavedAnalysis(state: SavedSessionLoadState) {
   const assessed = !!current && current.processing?.status === 'completed';
   const geometrySupplied = knee?.geometry?.source === 'caller-asserted-inference-dimensions';
   const geometryPersisted = knee?.geometry?.source === 'native-inference-bitmap';
+  const setupSource=current && result && 'setupProvenance' in result ? result.setupProvenance : null;
+  const assertionStatus=(kind:'direction'|'upright', supported:boolean) => !assessed ? 'not-assessed' :
+    setupSource?.[kind] === 'operator-recording-setup' ? 'persisted-operator' :
+    setupSource?.[kind] === `${kind}_conflict` ? 'conflict' :
+    setupSource?.[kind] === 'invalid_persisted_setup' ? 'invalid' : supported ? 'caller-asserted' : 'required';
+  const directionStatus=assertionStatus('direction',context?.direction === 1 || context?.direction === -1);
+  const uprightStatus=assertionStatus('upright',context?.upright === true);
   const labels = {
     unselected: 'No session selected', loading: 'Loading saved session',
     'load-failed': 'Saved-session read failed', 'invalid-data': 'Saved data or setup could not be accepted',
@@ -71,11 +78,10 @@ export function presentSavedAnalysis(state: SavedSessionLoadState) {
       geometry: {affects: ['knee'], status: !assessed ? 'not-assessed' : geometryPersisted ? 'persisted-native' : geometrySupplied ? 'caller-asserted' : 'required',
         requirement: 'Explicit inference dimensions valid throughout this session',
         value: geometrySupplied || geometryPersisted ? knee?.geometry ?? null : null},
-      direction: {affects: ['motion', 'intervals'], status: !assessed ? 'not-assessed' :
-        context?.direction === 1 || context?.direction === -1 ? 'caller-asserted' : 'required',
-        requirement: 'One travel direction in image x', value: context?.direction ?? null},
-      upright: {affects: ['motion', 'intervals'], status: !assessed ? 'not-assessed' : context?.upright === true ? 'caller-asserted' : 'required',
-        requirement: 'Explicit upright orientation confirmation', value: context?.upright ?? null},
+      direction: {affects: ['motion', 'intervals'], status: directionStatus,
+        requirement: 'One travel direction in image x', value: context?.direction ?? null, source:setupSource?.direction ?? null},
+      upright: {affects: ['motion', 'intervals'], status: uprightStatus,
+        requirement: 'Explicit upright orientation confirmation', value:uprightStatus==='conflict' || uprightStatus==='invalid'?null:context?.upright ?? null, source:setupSource?.upright ?? null},
       continuity: {affects: ['intervals'], status: !assessed ? 'not-assessed' :
         context?.continuity === 'detector-segments' ? 'requested' : 'required',
         requirement: 'Request checked detector segments; physical-cycle completeness remains unknown',

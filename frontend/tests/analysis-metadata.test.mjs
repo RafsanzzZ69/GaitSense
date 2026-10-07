@@ -151,7 +151,7 @@ test('unknown metadata extras are not forwarded as geometry evidence',()=>{
 });
 test('production wiring observes actual resized bitmap on all calls and saves metadata in summary JSON',()=>{
  assert.match(native,/val image = BitmapImageBuilder\(bitmap\).build\(\)[\s\S]*analysisMetadata.observe\(bitmap.width, bitmap.height\)\s*val poses = detector.detectForVideo/);
- assert.match(native,/\.put\("analysisMetadata", analysisMetadata.toJson\(\)\)/);
+ assert.match(native,/\.put\("analysisMetadata", analysisMetadata.toJson\(setup\)\)/);
  assert.match(native,/SQLiteOpenHelper\(context, "gaitsense-offline.db", null, 1\)/);
  assert.match(native,/SELECT summary FROM sessions ORDER BY created DESC LIMIT 100/);
 });

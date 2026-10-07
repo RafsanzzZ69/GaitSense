@@ -1,5 +1,10 @@
 # Structured saved analysis metadata — Sprint 5 Task 1
 
+Sprint 5 Task 4 adds `saved-analysis-metadata-2` through explicit recording setup.
+See `RECORDING_ANALYSIS_SETUP.md` for its assertion and conflict contract. Geometry
+and version-1 semantics below remain unchanged; setup-aware new recordings use v2,
+while legacy processing calls still emit v1. Historical records are never upgraded.
+
 Contract: `saved-analysis-metadata-1`, stored as the optional `analysisMetadata`
 property of session summary JSON. The independent expected JSON is in
 `tests/fixtures/analysis-metadata-v1.json`; native JVM tests compare the actual

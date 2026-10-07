@@ -13,13 +13,12 @@ which calls the existing coordinator with injected `Pose.listSessions` and
 `Pose.readFrames`. Results appear in a separate, explicitly session-labelled panel
 above History. `Close saved analysis` clears only the analysis selection.
 
-The screen does not have legitimate analysis setup. Camera-side selection, the
-instruction to hold upright, requested 720p capture and preview layout points do not
-establish persisted inference geometry, travel direction or upright confirmation.
-Therefore the production button calls `select(id)` without setup. Typical current
-saved sessions load but remain analytically unavailable, with explicit prerequisites.
-The integration supports future explicitly established setup through the binding;
-only synthetic tests supply it today. No fixture data enters production.
+The production button calls `select(id)` without caller setup. Sprint 5 persists
+native inference geometry and explicit operator recording-time direction/upright
+assertions for new sessions; see `RECORDING_ANALYSIS_SETUP.md`. Camera-side selection,
+phone-orientation instructions and preview layout points never supply those assertions.
+Historical sessions retain their original missing setup. Supported components may run
+independently, while absent/conflicting setup stays explicit. No fixture data enters production.
 
 ## Lifecycle and display
 

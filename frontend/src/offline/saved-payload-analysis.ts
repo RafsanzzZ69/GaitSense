@@ -1,11 +1,11 @@
 import {parseSession} from './contract.ts';
 import type {Session, PoseFrame} from './contract.ts';
 import type {ExplicitKneeGeometry, KneeGeometryInput} from './knee-flexion.ts';
-import {readAnalysisMetadata} from './analysis-metadata.ts';
+import {readAnalysisMetadata, ANALYSIS_METADATA_V2} from './analysis-metadata.ts';
 import type {GeometryUnavailableReason} from './analysis-metadata.ts';
 import {analyzeSavedSession} from './session-analysis.ts';
 
-export const SAVED_PAYLOAD_ADAPTER_VERSION = 'saved-payload-analysis-2';
+export const SAVED_PAYLOAD_ADAPTER_VERSION = 'saved-payload-analysis-3';
 export type BoundSavedRead = {sessionId: string} & (
   {status: 'loaded'; payload: string} | {status: 'failed'; reason: string});
 export type SavedAnalysisSetup = {
@@ -108,10 +108,31 @@ export function analyzeSavedPayload(request: unknown) {
     }
   }
   const typedSetup = setup as SavedAnalysisSetup;
+  let direction=typedSetup.direction ?? null, upright=typedSetup.upright === true;
+  let directionSource=direction===null?'not-supplied':'caller-asserted', uprightSource=upright?'caller-asserted':'not-confirmed';
+  const setupConflicts: ('direction_conflict'|'upright_conflict'|'invalid_persisted_setup')[]=[];
+  if (metadata.status === 'recognized') {
+    const d=metadata.metadata.direction,u=metadata.metadata.upright;
+    if (d.status === 'asserted') {
+      if (typedSetup.direction != null && typedSetup.direction !== d.value) {
+        setupConflicts.push('direction_conflict'); direction=null; directionSource='direction_conflict';
+      } else { direction=d.value; directionSource=d.source; }
+    }
+    if (u.status === 'asserted') {
+      if (typedSetup.upright !== undefined && typedSetup.upright !== u.value) {
+        setupConflicts.push('upright_conflict'); upright=false; uprightSource='upright_conflict';
+      } else { upright=u.value; uprightSource=u.source; }
+    }
+  } else if (metadata.status === 'unavailable' && object(session.analysisMetadata)
+    && session.analysisMetadata.contractVersion === ANALYSIS_METADATA_V2) {
+    setupConflicts.push('invalid_persisted_setup'); direction=null; upright=false;
+    directionSource=uprightSource='invalid_persisted_setup';
+  }
   const analysis = analyzeSavedSession({session, frames: frames as PoseFrame[], geometry,
+    setupConflicts,
     context: {sessionId: session.id, view: session.view, side: session.view === 'side_left' ? 'left' : 'right',
       participantId: typedSetup.participantId ?? null, attemptId: typedSetup.attemptId ?? null,
-      direction: typedSetup.direction ?? null, upright: typedSetup.upright === true,
+      direction, upright, directionSource:direction===null?undefined:directionSource==='operator-recording-setup'?'operator-recording-setup':'caller-asserted',
       continuity: typedSetup.continuity ?? 'unknown'},
     processing: {status: 'completed', reason: null}});
   return {...base, status: analysis.status, reasons: analysis.reasons, detail: null, session, loadedCount, analysis,
@@ -122,8 +143,7 @@ export function analyzeSavedPayload(request: unknown) {
     metadataAssessment: metadata,
     setupProvenance: {geometry: geometry?.source === 'native-inference-bitmap' ? 'persisted-native'
       : geometry?.source === 'unavailable-explicit-geometry' ? geometry.reason : geometry ? 'caller-supplied' : 'not-supplied',
-      direction: typedSetup.direction == null ? 'not-supplied' : 'caller-asserted',
-      upright: typedSetup.upright === true ? 'caller-asserted' : 'not-confirmed',
+      direction: directionSource, upright: uprightSource,
       ownership: 'caller-supplied-or-null', continuity: typedSetup.continuity ?? 'unknown'},
   };
 }

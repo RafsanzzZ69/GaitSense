@@ -1,6 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 export interface OfflinePoseNative {
   processVideo(uri: string, view: string, consent: boolean): Promise<string>;
+  processVideoWithSetup(uri: string, view: string, consent: boolean, setupJson: string): Promise<string>;
   listSessions(): Promise<string>;
   readFrames(id: string): Promise<string>;
   discardVideo(uri: string): Promise<void>;

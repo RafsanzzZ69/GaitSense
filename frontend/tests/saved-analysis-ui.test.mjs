@@ -8,6 +8,7 @@ import ts from 'typescript';
 import * as binding from '../src/offline/saved-analysis-binding.ts';
 import * as framing from '../src/offline/framing.ts';
 import * as contract from '../src/offline/contract.ts';
+import * as recordingSetup from '../src/offline/recording-analysis-setup.ts';
 import {createSavedSessionLoader} from '../src/offline/saved-session-loader.ts';
 import {presentSavedAnalysis} from '../src/offline/analysis-presentation.ts';
 
@@ -32,6 +33,7 @@ function renderer({expanded,history,phase='ready'}={}) {
  let requestedExpansion=expanded,arrayState=0;
  const react=expanded===undefined?React:{...React,useState:()=>[expanded,value=>{requestedExpansion=typeof value==='function'?value(expanded):value;}]};
  const Panel=component('SavedAnalysisPanel.tsx',{'react-native':native,react,'./saved-analysis-binding':binding}).SavedAnalysisPanel;
+ const SetupControls=component('RecordingAnalysisSetupControls.tsx',{'react-native':native}).RecordingAnalysisSetupControls;
  function render(p,onClear=()=>{}) {
   controls.length=0;texts.length=0;views.length=0;
   return renderToStaticMarkup(React.createElement(Panel,{presentation:p,onClear}));
@@ -42,7 +44,8 @@ function renderer({expanded,history,phase='ready'}={}) {
    'expo-router':{useFocusEffect(){}},'expo-camera':{useCameraPermissions:()=>[{granted:false},()=>{}]},
    'expo-video':{},'react-native-safe-area-context':{SafeAreaView:web.View},
    '../../modules/gaitsense-pose':{default:{}},'./framing':framing,'./contract':contract,
-   './saved-analysis-binding':binding,'./SavedAnalysisPanel':{SavedAnalysisPanel:Panel}}).default;
+   './saved-analysis-binding':binding,'./SavedAnalysisPanel':{SavedAnalysisPanel:Panel},
+   './recording-analysis-setup':recordingSetup,'./RecordingAnalysisSetupControls':{RecordingAnalysisSetupControls:SetupControls}}).default;
   return renderToStaticMarkup(React.createElement(OfflineCapture));
  }
  return {render,screen,controls,texts,views,get requestedExpansion(){return requestedExpansion;}};
@@ -113,6 +116,14 @@ test('new native metadata renders partial knee output while direction and uprigh
  assert.match(html,/Projected 2D knee flexion · available/);assert.match(html,/200 ms requested: 0 degrees; none/);
  assert.match(html,/One travel direction in image x: required/);assert.match(html,/Explicit upright orientation confirmation: required/);
  assert.match(html,/NOT_EVALUATED/);
+});
+test('v2 saved analysis renders operator direction/upright distinctly from native geometry',async()=>{
+ const f=fixture();f.session.analysisMetadata=JSON.parse(readFileSync(new URL('./fixtures/analysis-metadata-v2.json',import.meta.url),'utf8'));
+ const p=await loaded(f,{}),html=renderer({expanded:true}).render(p);
+ assert.match(html,/One travel direction in image x: persisted-operator/);
+ assert.match(html,/Operator recording setup: movement toward image right/);
+ assert.match(html,/upright image orientation confirmed/);assert.match(html,/not scientific validation/);
+ assert.match(html,/persisted-native/);assert.match(html,/unsupported direction source/);assert.match(html,/NOT_EVALUATED/);
 });
 for(const key of ['direction','upright'])test(`missing ${key} renders a reason without disabling supported knee output`,async()=>{
  const f=fixture();delete f.setup[key];const html=renderer({expanded:true}).render(await loaded(f));

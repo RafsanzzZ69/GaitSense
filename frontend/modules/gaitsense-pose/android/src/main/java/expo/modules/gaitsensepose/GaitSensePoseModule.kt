@@ -63,6 +63,21 @@ class GaitSensePoseModule : Module() {
     require(!file.exists() || file.delete()) { "Could not delete temporary recording; retry deletion" }
   }
 
+  private fun processRecording(uri: String, view: String, consent: Boolean, setup: RecordingAnalysisSetup?, promise: Promise) {
+    if (!busy.compareAndSet(false, true)) {
+      promise.reject("BUSY", "A recording is already being processed", null)
+    } else {
+      cancelled.set(false)
+      executor.execute {
+        try { promise.resolve(OfflinePoseProcessor(context, cancelled) { percent ->
+          sendEvent("onProgress", mapOf("percent" to percent))
+        }.process(uri, view, consent, setup)) }
+        catch (error: Exception) { promise.reject("OFFLINE_POSE", error.message ?: "Unable to extract pose", error) }
+        finally { busy.set(false) }
+      }
+    }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("GaitSensePose")
     Events("onProgress")
@@ -113,18 +128,12 @@ class GaitSensePoseModule : Module() {
       task(promise) { require(!busy.get()) { "Wait for processing to stop" }; PoseStore(context).use { it.writableDatabase.delete("sessions", null, null) }; null }
     }
     AsyncFunction("processVideo") { uri: String, view: String, consent: Boolean, promise: Promise ->
-      if (!busy.compareAndSet(false, true)) {
-        promise.reject("BUSY", "A recording is already being processed", null)
-      } else {
-        cancelled.set(false)
-        executor.execute {
-          try { promise.resolve(OfflinePoseProcessor(context, cancelled) { percent ->
-            sendEvent("onProgress", mapOf("percent" to percent))
-          }.process(uri, view, consent)) }
-          catch (error: Exception) { promise.reject("OFFLINE_POSE", error.message ?: "Unable to extract pose", error) }
-          finally { busy.set(false) }
-        }
-      }
+      processRecording(uri, view, consent, null, promise)
+    }
+    AsyncFunction("processVideoWithSetup") { uri: String, view: String, consent: Boolean, setupJson: String, promise: Promise ->
+      // Parse/copy before queuing; a malformed request must never be silently downgraded.
+      try { processRecording(uri, view, consent, RecordingAnalysisSetup.fromJson(setupJson), promise) }
+      catch (error: Exception) { promise.reject("OFFLINE_POSE", error.message ?: "Invalid recording setup", error) }
     }
     OnDestroy { cancelled.set(true); executor.shutdown() }
   }
@@ -151,7 +160,7 @@ internal class OfflinePoseProcessor(
   private fun remove(file: File) {
     require(!file.exists() || file.delete()) { "Could not delete temporary recording; retry deletion" }
   }
-  fun process(uri: String, view: String, consent: Boolean): String {
+  fun process(uri: String, view: String, consent: Boolean, setup: RecordingAnalysisSetup? = null): String {
     require(consent) { "Accept the local-processing notice first" }
     require(view in setOf("side_left", "side_right")) { "Choose the visible side" }
     val source = cameraFile(uri)
@@ -240,7 +249,7 @@ internal class OfflinePoseProcessor(
         .put("durationMs", duration).put("sampledFrames", sampled).put("poseFrames", frames.size)
         .put("usableFrameRatio", ratio).put("view", view).put("modelSha256", hash)
         .put("diagnostics", diagnosticText)
-        .put("analysisMetadata", analysisMetadata.toJson())
+        .put("analysisMetadata", analysisMetadata.toJson(setup))
         .put("extractorVersion", "android-pose-0.1.1").put("landmarkCount", 33)
         .put("rawVideoRetained", false).put("consentVersion", "local-prototype-notice-v1")
         .put("timestampMethod", "requested-100ms-nearest-decoded-frame")
