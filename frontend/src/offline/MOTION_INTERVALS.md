@@ -9,7 +9,7 @@ configuration `same-polarity-contiguous-1`. Scientific status is always NOT_EVAL
 
 The candidate type reuses the detector's timestampMs, side and kind fields. The caller
 adds stable candidate IDs, participantId/attemptId/sessionId (explicit null when unknown),
-and the detector result's caller-asserted direction to every candidate. segmentIndex is
+and the detector result's explicitly asserted image-x direction to every candidate. segmentIndex is
 copied from the detector or null if unavailable. The detector itself does not supply
 candidate IDs or ownership; this module does not invent them. IDs must be unique within
 one invocation. At least attemptId or sessionId must be known for an eligible interval.
@@ -19,7 +19,15 @@ known/unknown ownership within a sequence excludes the interval.
 Copy source algorithm/configuration versions, status/reasons and timestampProvenance
 from the detector result. Only ankle-motion-extrema-1 / ankle-motion-quality-1 and
 requested-100ms-nearest-decoded-frame with actualDecodedFrameTimes=false and
-usesStoredDifferences=true are supported. Direction source is caller-asserted.
+usesStoredDifferences=true are supported. Direction source is `caller-asserted` or
+`operator-recording-setup`. Both assert one straight travel direction: +1 increasing
+image x, -1 decreasing image x, independent of anatomical side. The latter is the
+explicit human assertion persisted by metadata v2; metadata v1 remains unassessed.
+The original source is retained in output, never relabeled. The source discriminator
+and an explicit compatible direction value are both required; accepting a source does
+not authenticate the assertion. Unknown sources remain unsupported. Sprint 5 Task 6
+adds this discriminator without changing input shape, schema version, algorithm or
+configuration versions, interval arithmetic or any other eligibility rule.
 No PTS or FPS is inferred. Unsupported/contradictory provenance makes all intervals
 unavailable; malformed structural input throws IntervalInputError with code/path.
 Numeric invalid timestamps remain in candidates and invalidCandidates diagnostics.
@@ -174,3 +182,26 @@ candidate motion and interval outputs for a supplied Session/PoseFrame sequence,
 explicit ownership/setup, unchanged algorithms and no UI/native/database integration.
 First review how the wrapper will retain exclusions and unknown physical-cycle completeness.
 Scientific validation and research acquisition approvals remain outstanding.
+
+## Sprint 5 Task 6 source compatibility
+
+The former single-source check was a whitelist for the original caller-only mapping,
+not an arithmetic dependence on who entered the direction. Both accepted sources
+represent an explicit human image-x direction assertion; neither proves its accuracy.
+The session wrapper now forwards its resolved source unchanged. Absent source retains
+the legacy direct-caller default. Persisted/caller conflicts still prevent motion and
+dependent interval calculation while preserving independently supported knee output.
+
+Focused verification: interval unit 51, detector mapping 19, sensitivity 16, session
+wrapper 16, saved-session wrapper 24, saved adapter 56, metadata 47, recording setup
+41, presentation 27, saved UI 22 and saved integration 15: 334/334 PASS, no failures
+or skips. TypeScript and whitespace checks pass. No native production code changed.
+Synthetic v2 adapter cases with explicitly requested, checked detector continuity
+produce 11 intervals per polarity, each 800 ms, for either direction and matching or
+absent caller assertions. Unknown continuity still excludes those same pairs.
+
+The production History action continues to supply no continuity request; this task
+does not change that policy or the UI. Actual PTS, exact-image evidence and physical
+cycle completeness remain unavailable/unknown. Recommend a selective source checkpoint
+before a separately authorized release build and phone smoke test of new recording
+setup. No research dataset is needed for that engineering acceptance test.

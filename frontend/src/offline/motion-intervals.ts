@@ -10,7 +10,7 @@ export type IntervalInput = {
   schemaVersion: 'candidate-motion-interval-input-1';
   sourceAlgorithmVersion: 'ankle-motion-extrema-1'; sourceConfigurationVersion: 'ankle-motion-quality-1';
   sourceStatus: MotionResult['status']; sourceReasons: string[];
-  directionSource: 'caller-asserted'; timestampProvenance: MotionResult['timestampProvenance'];
+  directionSource: 'caller-asserted' | 'operator-recording-setup'; timestampProvenance: MotionResult['timestampProvenance'];
   continuity: 'detector-segments' | 'unknown'; gaps: MotionResult['gaps'];
   candidates: IntervalCandidate[];
 };
@@ -51,7 +51,7 @@ export function calculateCandidateMotionIntervals(raw: unknown) {
   const provenance=input.timestampProvenance;
   const globalReasons:string[]=[];
   if(input.sourceAlgorithmVersion!=='ankle-motion-extrema-1'||input.sourceConfigurationVersion!=='ankle-motion-quality-1')globalReasons.push('unsupported_source_version');
-  if(input.directionSource!=='caller-asserted')globalReasons.push('unsupported_direction_source');
+  if(input.directionSource!=='caller-asserted' && input.directionSource!=='operator-recording-setup')globalReasons.push('unsupported_direction_source');
   if(!object(provenance)||provenance.method!=='requested-100ms-nearest-decoded-frame'||provenance.actualDecodedFrameTimes!==false||provenance.usesStoredDifferences!==true)globalReasons.push('unsupported_timestamp_provenance');
   if(input.sourceStatus==='unavailable')globalReasons.push('source_unavailable');
   // Check global order, including opposite-polarity observations; do not silently regroup corrupt chronology.

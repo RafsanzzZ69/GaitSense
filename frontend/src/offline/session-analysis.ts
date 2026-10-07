@@ -54,13 +54,11 @@ export function analyzeSavedSession(request:AnalysisRequest){
  // restricted identifier grammar. Never rename or encode one silently to manufacture compatibility.
  let intervals:Failure|{status:string;reasons:string[];result:ReturnType<typeof calculateCandidateMotionIntervals>};
  if(!motion)intervals=unavailable('motion_setup_unavailable',...conflicts);
- // The frozen interval contract accepts caller assertions only. Do not relabel stored operator evidence.
- else if(ctx.directionSource==='operator-recording-setup')intervals=unavailable('unsupported_direction_source');
  else if(!ownerId(session.id))intervals=unavailable('interval_session_id_incompatible');
  else {
   const result=calculateCandidateMotionIntervals({schemaVersion:'candidate-motion-interval-input-1',
    sourceAlgorithmVersion:motion.algorithmVersion,sourceConfigurationVersion:motion.configuration.version,
-   sourceStatus:motion.status,sourceReasons:motion.reasons,directionSource:'caller-asserted',
+   sourceStatus:motion.status,sourceReasons:motion.reasons,directionSource:ctx.directionSource ?? 'caller-asserted',
    timestampProvenance:motion.timestampProvenance,continuity,gaps:motion.gaps,
    candidates:motion.candidates.map((c,i)=>({id:`candidate-${i}`,participantId:ctx.participantId,attemptId:ctx.attemptId,sessionId:session.id,
     timestampMs:c.timestampMs,side:c.side,kind:c.kind,direction:motion.direction,segmentIndex:continuity==='unknown'?null:c.segmentIndex}))});

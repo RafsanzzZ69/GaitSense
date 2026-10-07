@@ -74,11 +74,13 @@ reasons. The panel explains the operator assertion and image direction. Geometry
 retains `persisted-native`. Wrapper/adapter/presentation contracts are now version 3.
 No detector thresholds, projection mathematics or interval mathematics changed.
 
-## Deliberately remaining interval boundary
+## Remaining interval boundaries
 
-`candidate-motion-interval-input-1` accepts only `caller-asserted` direction provenance.
-Persisted operator direction therefore returns `unsupported_direction_source` for
-intervals. It is never relabeled to make the old contract accept it. Motion may run
+Sprint 5 Task 6 explicitly extends `candidate-motion-interval-input-1` to accept
+`operator-recording-setup` as well as `caller-asserted`, preserving the original source.
+The previous `unsupported_direction_source` guard for operator setup is removed;
+unknown sources still fail closed. Every other interval eligibility gate remains.
+Motion may run
 when setup and real landmark/signal requirements permit; it may still be unavailable,
 partial or insufficient evidence. The History action supplies no continuity or
 participant/attempt ownership. Requested sampling times remain requested times;
@@ -107,4 +109,4 @@ This cross-cutting native/UI contract change warrants an independent review and
 selective checkpoint before a separately authorized release build. Then test explicit
 setup on a phone with one new engineering smoke-test recording, including offline
 reload, unassessed reset, historical History and setup-aware candidate motion. A
-research dataset is not required. Interval provenance remains a separate bounded task.
+research dataset is not required. Interval continuity and timestamp evidence remain limited.

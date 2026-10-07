@@ -9,7 +9,9 @@ Sprint 5's structured persistence and geometry precedence are specified in
 the saved-payload adapter is now `saved-payload-analysis-3`. Version-2 operator setup,
 distinct direction/upright conflicts and source limitations are specified in
 `RECORDING_ANALYSIS_SETUP.md`. Conflicts leave knee independent; persisted operator
-direction is not relabeled to satisfy the frozen interval contract. The Sprint 4 sections
+direction is passed unchanged to the interval contract, which now explicitly accepts
+both human-assertion sources. All timestamp, continuity and compatibility gates remain
+unchanged. The Sprint 4 sections
 below describe the historical caller-only path, which remains supported for old
 sessions. The saved adapter never parses diagnostic strings as geometry.
 

@@ -123,7 +123,7 @@ test('v2 saved analysis renders operator direction/upright distinctly from nativ
  assert.match(html,/One travel direction in image x: persisted-operator/);
  assert.match(html,/Operator recording setup: movement toward image right/);
  assert.match(html,/upright image orientation confirmed/);assert.match(html,/not scientific validation/);
- assert.match(html,/persisted-native/);assert.match(html,/unsupported direction source/);assert.match(html,/NOT_EVALUATED/);
+ assert.match(html,/persisted-native/);assert.match(html,/continuity unknown/);assert.match(html,/NOT_EVALUATED/);
 });
 for(const key of ['direction','upright'])test(`missing ${key} renders a reason without disabling supported knee output`,async()=>{
  const f=fixture();delete f.setup[key];const html=renderer({expanded:true}).render(await loaded(f));

@@ -32,6 +32,13 @@ function map(result,ownership=owner){
 }
 const run=r=>calculateCandidateMotionIntervals(map(r));
 const values=r=>r.polarities.map(p=>p.intervals.map(i=>i.elapsedMs));
+for(const direction of [1,-1])test(`real detector mapping retains operator source ${direction}`,()=>{
+ const d=detect(wave(),'left',direction),input=map(d);input.directionSource='operator-recording-setup';
+ const r=calculateCandidateMotionIntervals(input);
+ assert.equal(r.directionSource,'operator-recording-setup');
+ assert.deepEqual(values(r),direction===1?[[800,800],[800]]:[[800],[800,800]]);
+ assert.deepEqual(r.timestampProvenance,{method:'requested-100ms-nearest-decoded-frame',actualDecodedFrameTimes:false,usesStoredDifferences:true});
+});
 test('known 800ms waveform, separate polarity intervals and explicit identity',()=>{
  const d=detect(),r=run(d);
  assert.deepEqual(d.candidates.map(c=>c.timestampMs),[400,800,1200,1600,2000]);

@@ -71,11 +71,25 @@ for(const direction of [1,-1])test('persisted '+direction+' direction and uprigh
  assert.ok(Math.abs(r.analysis.components.motion.result.observations[0].value-direction*(-.1))<1e-8);
  assert.equal(r.setupProvenance.direction,'operator-recording-setup');assert.equal(r.setupProvenance.upright,'operator-recording-setup');
  assert.equal(r.analysis.components.knee.result.geometry.source,'native-inference-bitmap');
- assert.deepEqual(r.analysis.components.intervals.reasons,['unsupported_direction_source']);
+ assert.ok(r.analysis.components.intervals.reasons.includes('continuity_unknown'));
+ assert.equal(r.analysis.components.intervals.result.directionSource,'operator-recording-setup');
+ assert.equal(r.analysis.components.intervals.status,'unavailable');
 });
 test('matching caller setup retains authoritative persisted operator provenance',()=>{
  const r=analyze(fixture(),{direction:1,upright:true});assert.equal(r.analysis.components.motion.status,'available');
  assert.equal(r.setupProvenance.direction,'operator-recording-setup');assert.equal(r.setupProvenance.upright,'operator-recording-setup');
+});
+for(const direction of [1,-1])for(const matching of [false,true])test(`persisted ${direction} intervals with checked detector continuity, matching caller ${matching}`,()=>{
+ const f=fixture();f.session.analysisMetadata.direction.value=direction;
+ const setup={continuity:'detector-segments',...(matching?{direction,upright:true}:{})};
+ const r=analyze(f,setup),i=r.analysis.components.intervals;
+ assert.equal(i.status,'available');assert.equal(i.result.directionSource,'operator-recording-setup');
+ assert.equal(i.result.continuity,'detector-segments');
+ assert.deepEqual(i.result.polarities.map(p=>p.summary.count),[11,11]);
+ assert.ok(i.result.polarities.every(p=>p.intervals.every(v=>v.elapsedMs===800)));
+ assert.equal(i.result.timestampProvenance.actualDecodedFrameTimes,false);
+ assert.equal(r.analysis.components.knee.result.geometry.source,'native-inference-bitmap');
+ assert.equal(r.setupProvenance.direction,'operator-recording-setup');
 });
 for(const [setup,reasons] of [[{direction:-1},['direction_conflict']],[{upright:false},['upright_conflict']],
  [{direction:-1,upright:false},['direction_conflict','upright_conflict']]])test('conflicts '+reasons+' disable motion and intervals only',()=>{
