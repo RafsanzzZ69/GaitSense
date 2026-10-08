@@ -18,8 +18,8 @@ function Preview({ uri, size }: {uri: string; size: {width:number; height:number
   const player = useVideoPlayer(uri);
   return <VideoView player={player} style={[styles.camera,size]} nativeControls contentFit="contain" />;
 }
-function Action({label,onPress,disabled=false,accessibilityLabel=label}: {label:string; onPress:()=>void; disabled?:boolean; accessibilityLabel?:string}) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={[styles.button,disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
+function Action({label,onPress,disabled=false,accessibilityLabel=label,selected}: {label:string; onPress:()=>void; disabled?:boolean; accessibilityLabel?:string; selected?:boolean}) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{disabled,selected}} disabled={disabled} onPress={onPress} style={[styles.button,disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
 }
 export default function OfflineCapture() {
   const window = useWindowDimensions();
@@ -154,7 +154,9 @@ export default function OfflineCapture() {
         <Pressable accessibilityRole="checkbox" accessibilityState={{checked:consent,disabled:active||!!uri}} disabled={active||!!uri} onPress={()=>setConsent(!consent)} style={styles.choice}><Text style={styles.text}>{consent?'☑':'☐'} I understand and agree to local processing.</Text></Pressable>
       </View>
       <Text style={styles.heading}>Setup</Text><Text style={styles.text}>Use a steady phone, clear level path and even light. Keep one person's entire body visible from the side. Walk comfortably; stop if uncomfortable. Record 10–15 seconds. A three-second countdown precedes recording.</Text>
-      <View style={styles.row}>{(['side_left','side_right'] as SideView[]).map(side=><Action key={side} label={view===side?`✓ ${side}`:side} disabled={active||!!uri} onPress={()=>setView(side)}/>)}</View>
+      <Text accessibilityRole="header" style={styles.heading}>Which side of the person is facing the camera?</Text>
+      <Text style={styles.text}>Use the person's own left or right side, not the left or right of the image. This is separate from which way they walk.</Text>
+      <View style={styles.row}>{(['side_left','side_right'] as SideView[]).map(side=>{const label=side==='side_left'?'Left side of the person':'Right side of the person';return <Action key={side} label={view===side?`✓ ${label}`:label} accessibilityLabel={label} selected={view===side} disabled={active||!!uri} onPress={()=>setView(side)}/>;})}</View>
       <RecordingAnalysisSetupControls direction={direction} upright={upright} disabled={active||!!uri} onDirection={setDirection} onUpright={setUpright}/>
       {!permission?.granted ? <Action label="Allow camera (no microphone)" onPress={()=>void requestPermission().catch(reportError)}/> : <>
         {uri && phase==='preview' ? <Preview uri={uri} size={previewSize}/> : phase!=='processing' && <CameraView key={cameraKey} ref={camera} style={[styles.camera,previewSize]} ratio="16:9" facing="back" mode="video" mute videoQuality="720p" onCameraReady={()=>setReady(true)} onMountError={e=>{setReady(false);setError(e.message);}}/>}

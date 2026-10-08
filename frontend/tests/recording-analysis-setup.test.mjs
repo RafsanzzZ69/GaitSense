@@ -150,7 +150,7 @@ test('actual setup controls expose separate accessible direction radios and upri
  const C=component('RecordingAnalysisSetupControls.tsx',{'react-native':native}).RecordingAnalysisSetupControls;
  const selected=[];let upright=false;
  const html=renderToStaticMarkup(React.createElement(C,{direction:null,upright:false,disabled:false,onDirection:v=>selected.push(v),onUpright:v=>{upright=v;}}));
- assert.match(html,/image orientation is upright/);assert.match(html,/Holding the phone upright alone does not establish this/);
+ assert.match(html,/head toward the top, feet toward the bottom/);assert.match(html,/Which way will the person move across the image/);assert.match(html,/separate from the side of the person/);assert.match(html,/Holding the phone upright alone does not establish this/);
  const radios=controls.filter(c=>c.accessibilityRole==='radio');assert.equal(radios.length,3);assert.equal(radios[0].accessibilityState.checked,true);
  radios[1].onPress();radios[2].onPress();radios[0].onPress();assert.deepEqual(selected,[1,-1,null]);
  const checkbox=controls.find(c=>c.accessibilityRole==='checkbox');assert.equal(checkbox.accessibilityLabel,'Confirm upright image orientation for this recording');
@@ -200,10 +200,28 @@ function captureHarness({processingFails=false,processingError='synthetic read f
  const cleanups=effects.map(fn=>fn()).filter(fn=>typeof fn==='function');
  return {render,setup:()=>find(n=>n.type===Setup,tree).props,error:()=>find(n=>n.props.accessibilityRole==='alert',tree)?.props.children,
   press:label=>find(n=>n.props.label===label,tree).props.onPress(),
+  side:label=>find(n=>n.props.accessibilityLabel===label,tree),
   active:()=>refs.find(r=>r.current&&typeof r.current.start==='function').current.get(),resolveClip,rejectClip,requests,discarded,
   failCleanup(value){cleanupFails=value;},cameraReady(){find(n=>typeof n.props.onCameraReady==='function',tree).props.onCameraReady();},
   unmount(){cleanups.forEach(fn=>fn());}};
 }
+test('human-facing anatomical side controls retain values, selected state and locking',async()=>{
+ const h=captureHarness();const left='Left side of the person',right='Right side of the person';
+ let tree=h.render();
+ const labels=[];function collect(node){if(Array.isArray(node))node.forEach(collect);else if(React.isValidElement(node)){if(node.type===web.Text)labels.push(node.props.children);collect(node.props.children);}}
+ collect(tree);assert.ok(labels.includes('Which side of the person is facing the camera?'));
+ assert.ok(labels.some(x=>typeof x==='string'&&x.includes("person's own left or right side")&&x.includes('separate from which way they walk')));
+ assert.equal(h.side(left).props.selected,true);assert.equal(h.side(right).props.selected,false);
+ const Action=h.side(left).type;const button=Action(h.side(left).props);
+ assert.equal(button.props.accessibilityRole,'button');assert.equal(button.props.accessibilityLabel,left);assert.equal(button.props.accessibilityState.selected,true);
+ assert.ok(button.props.style[0].minHeight>=48);
+ h.press(right);h.render();assert.equal(h.side(right).props.selected,true);assert.equal(h.side(left).props.selected,false);
+ h.setup().onDirection(1);h.setup().onUpright(true);h.render();await start(h);h.render();
+ assert.deepEqual(h.active(),{view:'side_right',direction:1,upright:true});
+ assert.ok(h.side(left).props.disabled&&h.side(right).props.disabled);
+ const locked=Action(h.side(right).props);assert.equal(locked.props.accessibilityState.disabled,true);assert.equal(locked.props.accessibilityState.selected,true);
+ h.resolveClip({uri:'file:///cache/Camera/synthetic.mp4'});await flush();h.render();h.press('Discard video / retake');await flush();
+});
 async function flush(){for(let i=0;i<32;i++)await Promise.resolve();}
 async function start(h) {
  const previous=globalThis.setTimeout;globalThis.setTimeout=fn=>{queueMicrotask(fn);return 0;};
@@ -247,11 +265,11 @@ test('failed discard retains the original setup; successful retry resets the nex
 
 for(const view of ['side_left','side_right'])for(const direction of [null,1,-1])for(const upright of [false,true])
 test(`actual capture binds anatomical ${view} independently of direction ${direction}, upright ${upright}`,async()=>{
- const h=captureHarness();if(view==='side_right')h.press('side_right');
+ const h=captureHarness();if(view==='side_right')h.press('Right side of the person');
  h.setup().onDirection(direction);h.setup().onUpright(upright);h.render();await start(h);
  const snapshot=h.active();assert.deepEqual(snapshot,{view,direction,upright:upright?true:null});assert.ok(Object.isFrozen(snapshot));
  // Invoke stale controls deliberately, even though the real UI disables them.
- h.render();h.press(view==='side_left'?'side_right':'side_left');h.setup().onDirection(direction===1?-1:1);h.setup().onUpright(!upright);
+ h.render();h.press(view==='side_left'?'Right side of the person':'Left side of the person');h.setup().onDirection(direction===1?-1:1);h.setup().onUpright(!upright);
  h.resolveClip({uri:'file:///cache/Camera/synthetic.mp4'});await flush();h.render();h.press('Extract landmarks on this phone');await flush();h.render();
  assert.equal(h.requests.length,1);assert.equal(h.requests[0][1],view);
  assert.deepEqual(JSON.parse(h.requests[0][3]),{contractVersion:'recording-analysis-setup-1',direction,upright:upright?true:null});
@@ -260,7 +278,7 @@ test(`actual capture binds anatomical ${view} independently of direction ${direc
 
 test('real capture preserves detailed native quality rejection after cleanup/reset',async()=>{
  const diagnostic='Required joints failed visibility/presence/bounds checks in more than 30% of sampled frames (70% required). Diagnostics: view=side_right; usable=88; poseFrames=131; jointRejected=43; firstFailureExclusive=28:lowPresence=43';
- const h=captureHarness({processingFails:true,processingError:diagnostic});h.press('side_right');h.render();await start(h);
+ const h=captureHarness({processingFails:true,processingError:diagnostic});h.press('Right side of the person');h.render();await start(h);
  h.resolveClip({uri:'file:///cache/Camera/synthetic.mp4'});await flush();h.render();h.press('Extract landmarks on this phone');await flush();h.render();
  assert.equal(h.error(),diagnostic);assert.equal(h.requests[0][1],'side_right');assert.equal(h.active(),null);
  assert.deepEqual(h.discarded,['file:///cache/Camera/synthetic.mp4']);
