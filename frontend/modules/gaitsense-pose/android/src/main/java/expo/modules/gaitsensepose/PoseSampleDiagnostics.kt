@@ -1,9 +1,20 @@
 package expo.modules.gaitsensepose
 
 import kotlin.math.hypot
+import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 
 /** Aggregate diagnostics only. Never merge poses or relax acceptance based on overlap. */
-internal data class DiagnosticPoint(val x: Float, val y: Float, val visibility: Float, val presence: Float)
+internal data class DiagnosticPoint(
+  val x: Float, val y: Float, val visibility: Float, val presence: Float,
+  val visibilityPresent: Boolean = true, val presencePresent: Boolean = true
+) {
+  companion object {
+    fun fromLandmark(p: NormalizedLandmark) = DiagnosticPoint(
+      p.x(), p.y(), p.visibility().orElse(0f), p.presence().orElse(0f),
+      p.visibility().isPresent, p.presence().isPresent
+    )
+  }
+}
 internal class PoseSampleDiagnostics {
   var sampled = 0; private set
   var multiple = 0; private set

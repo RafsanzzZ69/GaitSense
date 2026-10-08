@@ -191,15 +191,16 @@ internal class OfflinePoseProcessor(
         .setMinPoseDetectionConfidence(0.6f).setMinPosePresenceConfidence(0.6f)
         .setMinTrackingConfidence(0.6f).build()
       val frames = mutableListOf<Pair<Long, JSONArray>>()
-      val required = if (view == "side_left") listOf(11, 23, 25, 27) else listOf(12, 24, 26, 28)
-      var sampled = 0; var usable = 0
+      val quality = RequiredJointQualityGate(view)
       PoseLandmarker.createFromOptions(context, options).use { detector ->
         for (timestamp in 0L until duration step 100L) {
           require(!cancelled.get()) { "Processing cancelled; no result saved" }
-          sampled++
           // Requested sampling timestamps are stored, not claimed to be original frame PTS.
           val decoded = retriever.getFrameAtTime(timestamp * 1000, MediaMetadataRetriever.OPTION_CLOSEST)
-          if (decoded == null) diagnostics.observe(timestamp, emptyList())
+          if (decoded == null) {
+            diagnostics.observe(timestamp, emptyList())
+            quality.observe(emptyList())
+          }
           if (decoded != null) {
             decodedSize = "${decoded.width}x${decoded.height}"
             val scale = minOf(1.0, 768.0 / maxOf(decoded.width, decoded.height))
@@ -210,16 +211,13 @@ internal class OfflinePoseProcessor(
               try {
                 analysisMetadata.observe(bitmap.width, bitmap.height)
                 val poses = detector.detectForVideo(image, timestamp).landmarks()
-                diagnostics.observe(timestamp, poses.map { points -> points.map { p ->
-                  DiagnosticPoint(p.x(), p.y(), p.visibility().orElse(0f), p.presence().orElse(0f))
-                } })
+                val diagnosticPoses = poses.map { points -> points.map { p ->
+                  DiagnosticPoint.fromLandmark(p)
+                } }
+                diagnostics.observe(timestamp, diagnosticPoses)
+                quality.observe(diagnosticPoses)
                 if (poses.size == 1 && poses[0].size == 33) {
                   val landmarks = poses[0]
-                  val good = required.all { i ->
-                    val p = landmarks[i]
-                    p.visibility().orElse(0f) >= .6f && p.presence().orElse(0f) >= .6f && p.x() in 0f..1f && p.y() in 0f..1f
-                  }
-                  if (good) usable++
                   val data = JSONArray()
                   landmarks.forEachIndexed { i, p -> data.put(JSONObject().put("index", i).put("x", p.x().toDouble()).put("y", p.y().toDouble()).put("z", p.z().toDouble()).put("visibility", p.visibility().orElse(0f).toDouble()).put("presence", p.presence().orElse(0f).toDouble())) }
                   frames.add(timestamp to data)
@@ -235,15 +233,17 @@ internal class OfflinePoseProcessor(
         }
       }
       require(!cancelled.get()) { "Processing cancelled; no result saved" }
+      val sampled = quality.sampled
+      val usable = quality.usable
       val diagnosticText = "durationMs=$duration; processingMs=${android.os.SystemClock.elapsedRealtime() - started}; " +
         "encoded=${encodedWidth}x${encodedHeight}; rotation=$rotation; decoded=$decodedSize; " +
-        "${diagnostics.report()}; usable=$usable; poseFrames=${frames.size}"
+        "${diagnostics.report()}; usable=$usable; poseFrames=${frames.size}; ${quality.report()}"
       require(diagnostics.singlePersonGatePasses()) {
         "Multiple pose candidates in more than 5% of samples; record alone. " +
           "Overlapping detections are not proof of another person. Diagnostics: $diagnosticText"
       }
-      val ratio = usable.toDouble() / sampled
-      require(ratio >= .7) { "Required joints visible in fewer than 70% of sampled frames; please retake. Diagnostics: $diagnosticText" }
+      val ratio = quality.usableRatio
+      require(quality.passes()) { "Required joints failed visibility/presence/bounds checks in more than 30% of sampled frames (70% required). Diagnostics: $diagnosticText" }
       val id = UUID.randomUUID().toString()
       val summary = JSONObject().put("id", id).put("createdAt", System.currentTimeMillis())
         .put("durationMs", duration).put("sampledFrames", sampled).put("poseFrames", frames.size)

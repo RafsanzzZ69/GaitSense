@@ -175,14 +175,14 @@ test('actual capture/native wiring snapshots before countdown and passes the sam
 
 // Controlled hooks execute the real capture handlers without a native camera or a
 // React scheduler. This checks request/lifetime wiring, not Android rendering.
-function captureHarness({processingFails=false}={}) {
+function captureHarness({processingFails=false,processingError='synthetic read failure'}={}) {
  const states=[],refs=[],effects=[],requests=[],discarded=[];let stateIndex=0,refIndex=0,nullRefs=0;
  let resolveClip,rejectClip;const clip=new Promise((resolve,reject)=>{resolveClip=resolve;rejectClip=reject;});
  const camera={recordAsync:()=>clip,stopRecording(){}};
  let cleanupFails=false;
  const f=fixture();const pose={listSessions:async()=>JSON.stringify([f.session]),readFrames:async()=>JSON.stringify(f.frames),cancel(){},
   addListener:()=>({remove(){}}),discardVideo:async uri=>{discarded.push(uri);if(cleanupFails)throw Error('synthetic cleanup failure');},
-  processVideoWithSetup:async(...args)=>{requests.push(args);if(processingFails)throw Error('synthetic read failure');return JSON.stringify(f.session);}};
+  processVideoWithSetup:async(...args)=>{requests.push(args);if(processingFails)throw Error(processingError);return JSON.stringify(f.session);}};
  const react={...React,useState:initial=>{const i=stateIndex++;if(!(i in states))states[i]=initial;
    return [states[i],value=>{states[i]=typeof value==='function'?value(states[i]):value;}];},
   useRef:initial=>{const i=refIndex++;if(!refs[i]){refs[i]={current:initial};if(initial===null&&++nullRefs===2)refs[i].current=camera;}return refs[i];},
@@ -198,7 +198,8 @@ function captureHarness({processingFails=false}={}) {
   else if(React.isValidElement(node)){if(predicate(node))return node;return find(predicate,node.props.children);}return null;}
  render();states[2]=true;states[3]=true;render();
  const cleanups=effects.map(fn=>fn()).filter(fn=>typeof fn==='function');
- return {render,setup:()=>find(n=>n.type===Setup,tree).props,press:label=>find(n=>n.props.label===label,tree).props.onPress(),
+ return {render,setup:()=>find(n=>n.type===Setup,tree).props,error:()=>find(n=>n.props.accessibilityRole==='alert',tree)?.props.children,
+  press:label=>find(n=>n.props.label===label,tree).props.onPress(),
   active:()=>refs.find(r=>r.current&&typeof r.current.start==='function').current.get(),resolveClip,rejectClip,requests,discarded,
   failCleanup(value){cleanupFails=value;},cameraReady(){find(n=>typeof n.props.onCameraReady==='function',tree).props.onCameraReady();},
   unmount(){cleanups.forEach(fn=>fn());}};
@@ -242,4 +243,37 @@ test('failed discard retains the original setup; successful retry resets the nex
  h.failCleanup(false);h.press('Discard video / retake');await flush();h.render();assert.equal(h.active(),null);
  assert.equal(h.setup().direction,null);assert.equal(h.setup().upright,false);h.cameraReady();h.render();await start(h);
  assert.deepEqual(h.active(),{view:'side_left',direction:null,upright:null});
+});
+
+for(const view of ['side_left','side_right'])for(const direction of [null,1,-1])for(const upright of [false,true])
+test(`actual capture binds anatomical ${view} independently of direction ${direction}, upright ${upright}`,async()=>{
+ const h=captureHarness();if(view==='side_right')h.press('side_right');
+ h.setup().onDirection(direction);h.setup().onUpright(upright);h.render();await start(h);
+ const snapshot=h.active();assert.deepEqual(snapshot,{view,direction,upright:upright?true:null});assert.ok(Object.isFrozen(snapshot));
+ // Invoke stale controls deliberately, even though the real UI disables them.
+ h.render();h.press(view==='side_left'?'side_right':'side_left');h.setup().onDirection(direction===1?-1:1);h.setup().onUpright(!upright);
+ h.resolveClip({uri:'file:///cache/Camera/synthetic.mp4'});await flush();h.render();h.press('Extract landmarks on this phone');await flush();h.render();
+ assert.equal(h.requests.length,1);assert.equal(h.requests[0][1],view);
+ assert.deepEqual(JSON.parse(h.requests[0][3]),{contractVersion:'recording-analysis-setup-1',direction,upright:upright?true:null});
+ assert.equal(h.active(),null);assert.equal(snapshot.view,view);assert.equal(snapshot.direction,direction);assert.equal(snapshot.upright,upright?true:null);
+});
+
+test('real capture preserves detailed native quality rejection after cleanup/reset',async()=>{
+ const diagnostic='Required joints failed visibility/presence/bounds checks in more than 30% of sampled frames (70% required). Diagnostics: view=side_right; usable=88; poseFrames=131; jointRejected=43; firstFailureExclusive=28:lowPresence=43';
+ const h=captureHarness({processingFails:true,processingError:diagnostic});h.press('side_right');h.render();await start(h);
+ h.resolveClip({uri:'file:///cache/Camera/synthetic.mp4'});await flush();h.render();h.press('Extract landmarks on this phone');await flush();h.render();
+ assert.equal(h.error(),diagnostic);assert.equal(h.requests[0][1],'side_right');assert.equal(h.active(),null);
+ assert.deepEqual(h.discarded,['file:///cache/Camera/synthetic.mp4']);
+});
+
+test('native quality wiring takes anatomical view only; metadata rotation and setup cannot swap it',()=>{
+ const native=readFileSync(new URL('../modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt',import.meta.url),'utf8');
+ assert.match(native,/val quality = RequiredJointQualityGate\(view\)/);
+ assert.match(native,/diagnostics\.observe\(timestamp, diagnosticPoses\)\s+quality\.observe\(diagnosticPoses\)/);
+ assert.match(native,/if \(decoded == null\) \{\s+diagnostics\.observe\(timestamp, emptyList\(\)\)\s+quality\.observe\(emptyList\(\)\)/);
+ assert.match(native,/val ratio = quality\.usableRatio\s+require\(quality\.passes\(\)\)/);
+ assert.match(native,/\$\{quality\.report\(\)\}/);
+ assert.equal((native.match(/\brotation\b/g)||[]).length,3); // declaration, diagnostic key, interpolation only
+ const parser=readFileSync(new URL('../modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/RecordingAnalysisSetup.kt',import.meta.url),'utf8');
+ assert.doesNotMatch(parser,/side_left|side_right/);
 });
