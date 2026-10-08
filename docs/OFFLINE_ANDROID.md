@@ -1,7 +1,122 @@
 # Offline Android landmark prototype
 
-SAMSUNG UPDATE BUILT/VERIFIED; USER-REPORTED CAPTURE AND RESTART/DELETION CHECKS PASS.
-Complete offline-from-start capture/processing acceptance remains pending.
+Latest diagnostic build: **user-reported Sprint 5 physical acceptance PASS** on
+8 October 2026 for the tested Android device/session/build. Scientific status:
+**NOT_EVALUATED**. The earlier build/test sections below retain historical
+results, artifact hashes and then-pending checks; they are not current status.
+
+## Diagnostic-build physical acceptance — 8 October 2026
+
+Recorded on 9 October 2026 from the owner's supplied acceptance account, including
+a separate screen-recording demonstration of offline restart. This checkpoint
+documents that report; it did not independently inspect private media, execute
+a device test or rebuild the APK. The current account does not restate the phone
+model/OS; earlier Samsung device details are not automatically assigned to it.
+
+### Build identity and scope
+
+| Property | Accepted diagnostic build |
+| --- | --- |
+| Source commit | `7d41b5987d204a173c5dca5f91a73d2a50781f22` |
+| APK | `frontend/android/app/build/outputs/apk/release/app-release.apk` |
+| Size | 117,288,199 bytes |
+| APK SHA-256 | `f0fe6c22950ecba42a92e3e2cfa2ba9800d9bb14631802f3549a3711c5c3bfa8` |
+| Package | `com.gaitsense.research` |
+| versionCode / versionName | `1` / `0.1.0` |
+| Minimum / target API | `26` / `36` |
+| Signing | APK Signature Scheme v2 verified during the preceding static build check |
+| Certificate SHA-256 | `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c` — matched the previous release |
+
+Scope: installed/updated diagnostic release, one fresh engineering side-view
+walking recording, saved-session analysis and offline close/reopen persistence.
+This is application engineering acceptance, **not research dataset collection**.
+Static build/package verification and the owner's physical observations are
+separate evidence sources. This does not establish compatibility with all Android
+devices or completion of the entire application.
+
+### Earlier rejections and unchanged gate
+
+Earlier engineering attempts included 123/123 pose frames with only 39 usable,
+and 131/131 pose frames with 88 usable (67.18%, four short of the required 92).
+They preceded detailed joint-level instrumentation. Their exact rejection causes
+remain unknown; no side-binding or Sprint 5 regression was demonstrated.
+The diagnosis was **CURRENT DIAGNOSTICS HAD BEEN INSUFFICIENT TO DISTINGUISH
+IMPLEMENTATION ERROR FROM LEGITIMATE POSE-QUALITY REJECTIONS**. The later success
+does not retrospectively explain those failures. See the
+[required-joint diagnosis](REQUIRED_JOINT_QUALITY_GATE_DIAGNOSIS.md).
+
+The gate was not tuned using these recordings. A usable sample still requires
+exactly one 33-landmark pose with all four selected anatomical joints passing
+simultaneously:
+
+| Selected side | Shoulder | Hip | Knee | Ankle |
+| --- | ---: | ---: | ---: | ---: |
+| side_left | 11 | 23 | 25 | 27 |
+| side_right | 12 | 24 | 26 | 28 |
+
+Each selected joint requires visibility >=0.6, presence >=0.6 and normalized x/y
+within inclusive [0,1]. Session acceptance remains `usable / sampled >= 0.70`.
+No threshold relaxation or automatic side switching occurred. Anatomical side
+remains independent of image-x travel direction.
+
+### Successful engineering recording and saved analysis
+
+The owner explicitly selected anatomical side_right, travel toward image right
+and upright-image confirmation before recording on the installed diagnostic build.
+
+| Reported diagnostic | Value |
+| --- | --- |
+| samples / poseFrames / usable | 115 / 115 / 115 |
+| Usable rate | 100% |
+| view / required indices | side_right / 12,24,26,28 |
+| visibilityMin / presenceMin / usableMin | 0.6 / 0.6 / 0.7 |
+| noPose / multi / rejected / jointRejected / missingRequiredLandmark | 0 / 0 / 0 / 0 / 0 |
+| Exclusive first-failure | none |
+| Required shoulder / hip / knee / ankle rejection counts | 0 / 0 / 0 / 0 |
+
+The successful session saved and loaded from History. Projected **2D knee
+flexion**, **candidate ankle-motion extrema**, and **candidate-to-candidate
+temporal intervals** were available. Native inference geometry loaded from
+metadata; image-right travel direction and upright image orientation persisted
+with operator-recording-setup provenance.
+
+This supplies real-device engineering evidence for recording setup -> immutable
+snapshot -> MediaPipe -> unchanged quality gate -> metadata-v2/SQLite save ->
+History reload -> projected knee and candidate motion -> checked continuity ->
+candidate intervals. It demonstrates that the unchanged gate can pass a real
+recording on this build, without proving why earlier recordings failed.
+
+### Offline restart acceptance
+
+The owner then placed the device in Airplane mode with Wi-Fi unavailable, fully
+closed GaitSense and reopened it. History and the new session remained present;
+saved data, native inference geometry, operator direction, upright assertion,
+projected knee, candidate extrema and candidate intervals loaded again.
+
+**Newest Sprint 5 physical acceptance: PASS for this tested device/session/build**,
+including reported offline restart/persistence and saved-analysis reload.
+The current report does not establish that this new recording's entire capture
+and processing ran offline from the start, specify Android force-stop/process-kill
+semantics, directly inspect SQLite/cache files, or report a new deletion test.
+The older offline-from-start/deletion reports below remain distinct historical runs.
+
+### Scientific boundaries and remaining work
+
+Scientific status remains **NOT_EVALUATED**. This engineering pass does not
+establish scientific/clinical validity, diagnostic accuracy, walking-speed
+accuracy, actual decoded-frame PTS, exact-image correspondence or independently
+authenticated frame ownership. It does not validate heel strikes, toe-offs,
+physical gait events, step/stride times, cadence or 3D knee angles. Knee geometry
+remains projected 2D; extrema remain candidates; intervals remain
+candidate-to-candidate intervals; timestamps remain requested sampling timestamps.
+
+Both app reliability and defensible ML/thesis evaluation remain required. App work
+still includes broader multi-device acceptance; failure-state/preview/restart
+robustness; UX/accessibility polish; regression coverage; future selected-ML-model
+integration and Python/mobile prediction parity; runtime/thermal/memory testing;
+and final release/demo readiness. None is replaced by this single-session pass.
+Research protocol, independent references, governance and participant-separated
+evaluation remain separate gates before scientific collection/evaluation.
 
 ## Implemented scope
 
@@ -19,11 +134,12 @@ Complete offline-from-start capture/processing acceptance remains pending.
 - App backup disabled in main manifest; release-only overlay removes INTERNET
   and SYSTEM_ALERT_WINDOW. Debug builds keep Metro connectivity.
 
-These are implemented source paths, not evidence of native execution. This is
+Implementation alone is not evidence of native execution; the latest user-reported
+physical evidence is scoped above. This is
 single-profile prototype storage, not complete FR-01/FR-09 functionality. No ML
 gait classifier, clinical score, calibrated measurement or dataset approval.
 
-## Verification performed
+## Historical automated verification
 
 - 24 frontend tests passed (8 new offline tests, 16 existing tests).
 - TypeScript checks passed.
