@@ -1,0 +1,200 @@
+{
+  "fixture_id": "SYN-CASE-30",
+  "description": "Fake withdrawn accounting retains no inclusion.",
+  "expected": {
+    "ledger_valid": true,
+    "error": null,
+    "reference_eligible": [],
+    "paired_eligible": []
+  },
+  "manifest": {
+    "schema": "gaitsense-v2-invariant-fixture-0.1",
+    "evidence_kind": "synthetic",
+    "scientific_status": "NOT_EVALUATED",
+    "versions": {
+      "dataset": "SYN-DATA-1",
+      "annotation": "SYN-ANN-1",
+      "feature": "SYN-FEAT-1",
+      "preprocessing": "SYN-PRE-1",
+      "split": "SYN-SPLIT-1",
+      "protocol": "SYN-PROTOCOL-1"
+    },
+    "simulated_policy": {
+      "status": "simulated",
+      "version": "SYN-POLICY-1",
+      "disagreement_seconds": 0.05,
+      "combination_rule": "mean_or_third"
+    },
+    "participants": [
+      {
+        "participant_id": "SYN-P-1",
+        "identity_status": "known",
+        "partition": "train",
+        "governance": "simulated_withdrawn",
+        "consent_ref": "SYN-CONSENT-POINTER",
+        "institution_ref": "SYN-INSTITUTION-POINTER",
+        "retention_ref": "SYN-RETENTION-POINTER",
+        "withdrawal_status": "none"
+      }
+    ],
+    "trials": [
+      {
+        "trial_id": "SYN-T-1",
+        "session_id": "SYN-S-1",
+        "participant_id": "SYN-P-1",
+        "planned_status": "attempted",
+        "reason": null
+      }
+    ],
+    "attempts": [
+      {
+        "participant_id": "SYN-P-1",
+        "session_id": "SYN-S-1",
+        "trial_id": "SYN-T-1",
+        "attempt_id": "SYN-A-1",
+        "partition": "train",
+        "attempt_status": "completed",
+        "capture_status": "captured",
+        "processing_status": "succeeded",
+        "failure_reason": null,
+        "replacement_of_attempt_id": null,
+        "replacement_decision_ref": null,
+        "use_requested": false,
+        "annotation_version": "SYN-ANN-1",
+        "reference": {
+          "status": "accepted",
+          "workflow": "accepted",
+          "reason": null,
+          "source_file_id": "SYN-SRC-1",
+          "provenance_ref": "SYN-REF-EVIDENCE-1",
+          "annotation_version": "SYN-ANN-1",
+          "revision": "SYN-REV-1",
+          "policy_version": "SYN-POLICY-1",
+          "crossing_rule_version": "SYN-CROSS-1",
+          "method": "independent_measured_zone",
+          "timing": {
+            "class": "decoded_pts",
+            "simulated_qualified": true,
+            "qualification_ref": "SYN-QUAL-1",
+            "clock_id": "SYN-CLOCK-1",
+            "method_version": "SYN-TIME-1",
+            "timebase_num": 1,
+            "timebase_den": 1000,
+            "origin_ticks": 0,
+            "sync_ref": null
+          },
+          "distance": {
+            "value_m": 6,
+            "uncertainty_m": 0.01,
+            "method_ref": "SYN-DIST-METHOD-1",
+            "verification_ref": "SYN-DIST-VERIFY-1",
+            "course_id": "SYN-COURSE-1"
+          },
+          "observer_a": {
+            "observer_id": "SYN-OBS-A",
+            "start_seconds": 2,
+            "end_seconds": 7,
+            "timing": {
+              "class": "decoded_pts",
+              "simulated_qualified": true,
+              "qualification_ref": "SYN-QUAL-1",
+              "clock_id": "SYN-CLOCK-1",
+              "method_version": "SYN-TIME-1",
+              "timebase_num": 1,
+              "timebase_den": 1000,
+              "origin_ticks": 0,
+              "sync_ref": null
+            },
+            "source_file_id": "SYN-SRC-1",
+            "start_support": {
+              "evidence_id": "SYN-BOUNDARY-START",
+              "ticks": 2000
+            },
+            "end_support": {
+              "evidence_id": "SYN-BOUNDARY-END",
+              "ticks": 7000
+            },
+            "uncertainty_seconds": 0.02,
+            "uncertainty_method": "SYN-UNC-OBS-1",
+            "confidence": "synthetic_clear",
+            "independent": true,
+            "model_blinded": true,
+            "locked": true,
+            "submission_ref": "SYN-SUB-A",
+            "annotation_version": "SYN-ANN-1"
+          },
+          "observer_b": {
+            "observer_id": "SYN-OBS-B",
+            "start_seconds": 2,
+            "end_seconds": 7,
+            "timing": {
+              "class": "decoded_pts",
+              "simulated_qualified": true,
+              "qualification_ref": "SYN-QUAL-1",
+              "clock_id": "SYN-CLOCK-1",
+              "method_version": "SYN-TIME-1",
+              "timebase_num": 1,
+              "timebase_den": 1000,
+              "origin_ticks": 0,
+              "sync_ref": null
+            },
+            "source_file_id": "SYN-SRC-1",
+            "start_support": {
+              "evidence_id": "SYN-BOUNDARY-START",
+              "ticks": 2000
+            },
+            "end_support": {
+              "evidence_id": "SYN-BOUNDARY-END",
+              "ticks": 7000
+            },
+            "uncertainty_seconds": 0.02,
+            "uncertainty_method": "SYN-UNC-OBS-1",
+            "confidence": "synthetic_clear",
+            "independent": true,
+            "model_blinded": true,
+            "locked": true,
+            "submission_ref": "SYN-SUB-B",
+            "annotation_version": "SYN-ANN-1"
+          },
+          "adjudication": {
+            "status": "not_required",
+            "observer": null,
+            "rationale_ref": null,
+            "decision_ref": null
+          },
+          "accepted_start_seconds": 2,
+          "accepted_end_seconds": 7,
+          "crossing_duration_seconds": 5,
+          "final_speed_mps": 1.2,
+          "reference_uncertainty": {
+            "duration_seconds": 0.04,
+            "speed_mps": 0.02,
+            "method_ref": "SYN-UNC-REF-1"
+          }
+        },
+        "prediction": {
+          "status": "unavailable",
+          "predicted_speed_mps": null,
+          "model_run_id": null
+        }
+      }
+    ],
+    "assets": [
+      {
+        "source_file_id": "SYN-SRC-1",
+        "attempt_id": "SYN-A-1",
+        "file_sha256": "c23541b6edc6ef6e06f96db3c20f36b57881beabd872640a2babbfef8278c0d4",
+        "content_lineage_id": "SYN-LINEAGE-1",
+        "kind": "original",
+        "parent_source_file_id": null,
+        "relationship": null,
+        "provenance_ref": "SYN-SOURCE-PROVENANCE",
+        "availability": "synthetic_available"
+      }
+    ],
+    "derived": [],
+    "runs": [],
+    "split_frozen": true,
+    "frozen_test_participants": []
+  }
+}
