@@ -7,6 +7,8 @@ import { useAuth } from './useAuth';
 import { validateAuthForm } from './auth-errors';
 import type { AuthOperation } from './auth-types';
 import { useNavigationSettlement } from '@/navigation/NavigationSettlement';
+import { useEntryPreferences } from '@/entry/EntryPreferencesProvider';
+import { appEntry } from '@/entry/app-entry';
 
 type Mode = 'welcome' | 'login' | 'register' | 'reset' | 'verification';
 export const authRoutes = {
@@ -28,6 +30,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
   const auth = useAuth();
   const router = useRouter();
   const boundary = useNavigationSettlement();
+  const preferences = useEntryPreferences();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -42,7 +45,9 @@ export function AuthScreen({ mode }: { mode: Mode }) {
   const leaveForms = (verification = false) => {
     // Clear the independent account stack; never push Home over a gait owner.
     router.dismissAll();
-    router.replace(verification ? authRoutes.verification : '/');
+    const entry = appEntry(auth.getSnapshot().session.status, preferences.getSnapshot());
+    router.replace(entry === 'ACK_REQUIRED' ? '/acknowledgement' : entry === 'ONBOARDING_REQUIRED' ? '/guide'
+      : verification ? authRoutes.verification : '/');
   };
   useEffect(() => {
     if ((mode === 'register' || mode === 'login' || mode === 'reset') && auth.session.status === 'SIGNED_IN' && !auth.busy && !navigated.current) {
@@ -112,6 +117,8 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           {!auth.session.user.emailVerified && <Button title="Email verification" onPress={() => router.push(authRoutes.verification)} disabled={blocked} />}
           <Button title="Continue to local app" onPress={() => leaveForms()} disabled={blocked} />
           <Button title="Sign out" onPress={confirmSignOut} disabled={blocked} secondary />
+          <Button title="View app guide" onPress={() => router.push('/guide')} disabled={blocked || appEntry(auth.session.status, preferences) === 'ACK_REQUIRED'} secondary />
+          <Button title="Review app acknowledgement" onPress={() => router.push('/acknowledgement')} disabled={blocked} secondary />
           {auth.busy === 'signout' && <Text style={styles.body}>Sign-out requested. If a measurement is active, finish or cancel it and complete video cleanup first. Waiting for account session removal.</Text>}
           {auth.signOutMessage && <Text accessibilityRole="alert" style={styles.message}>{auth.signOutMessage}</Text>}
         </> : <>

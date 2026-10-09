@@ -2,10 +2,12 @@ import React from 'react';
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { load } from './auth-controller-harness.mjs';
+const { appEntry } = load('src/entry/app-entry.ts');
 import * as theme from '../../src/constants/theme.ts';
 const require = createRequire(import.meta.url);
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
-export function screen(mode, { signedIn = false, verified = false, status, run, requestSignOut } = {}) {
+export function screen(mode, { signedIn = false, verified = false, status, run, requestSignOut, preferences = { status: 'READY', versions: { acknowledgementVersion: 1, onboardingVersion: 1 } } } = {}) {
   const states = [], refs = [], effects = [], navigations = [], operations = [], alerts = [];
   let cursor = 0, refCursor = 0, effectCursor = 0, tree, updates = 0;
   const auth = { session: signedIn ? { status: 'SIGNED_IN', user: { uid: 'fixture', emailVerified: verified } } : { status: status || 'SIGNED_OUT', user: null }, busy: null,
@@ -22,7 +24,7 @@ export function screen(mode, { signedIn = false, verified = false, status, run, 
   const boundary = { requestDeparture() {} };
   const replacements = { react: hooks, 'react-native': native, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     'expo-router': { useRouter: () => Object.fromEntries(['push', 'dismissAll', 'replace', 'dismissTo'].map(name => [name, (...args) => navigations.push([name, ...args])])) },
-    '@/navigation/NavigationSettlement': { useNavigationSettlement: () => boundary }, '@/constants/theme': theme, './useAuth': { useAuth: () => auth } };
+    '@/entry/EntryPreferencesProvider': { useEntryPreferences: () => ({ ...preferences, getSnapshot: () => preferences }) }, '@/entry/app-entry': { appEntry }, '@/navigation/NavigationSettlement': { useNavigationSettlement: () => boundary }, '@/constants/theme': theme, './useAuth': { useAuth: () => auth } };
   const js = ts.transpileModule(read('src/auth/AuthScreens.tsx'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
   const module = { exports: {} };
   new Function('require', 'module', 'exports', js)(id => {
