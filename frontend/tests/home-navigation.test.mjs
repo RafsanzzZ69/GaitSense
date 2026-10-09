@@ -46,7 +46,7 @@ test('Android index renders real Home and the primary accessible action opens /o
   assert.equal(component('src/app/index.android.tsx', { '@/home/HomeScreen': { default: 'real-home' } }).default, 'real-home');
   assert.match(h.html, /GaitSense/);
   assert.match(h.html, /Offline gait analysis using your phone camera/);
-  assert.equal(h.controls.length, 1);
+  assert.equal(h.controls.length, 2);
   const button = h.controls[0];
   assert.equal(button.accessibilityRole, 'button');
   assert.equal(button.accessibilityLabel, 'Start Gait Measurement');
@@ -63,6 +63,12 @@ test('rapid activations before a render open once; returning focus permits a new
   h.refocus();
   h.controls[0].onPress();
   assert.deepEqual(h.pushes, ['/offline', '/offline']);
+});
+test('Email account entry shares the rapid-tap latch with measurement navigation', () => {
+  const h = home();
+  h.controls[1].onPress(); h.controls[1].onPress(); h.controls[0].onPress();
+  assert.deepEqual(h.pushes, ['/account']);
+  h.refocus(); h.controls[0].onPress(); assert.deepEqual(h.pushes, ['/account', '/offline']);
 });
 
 test('synchronous navigation failure releases the tap latch for retry', () => {
@@ -81,6 +87,9 @@ test('Home states local storage, transitional History and scientific limits with
   assert.match(h.html, /not clinically validated/);
   assert.match(h.html, /does not provide a diagnosis or treatment guidance/);
   assert.doesNotMatch(h.html, /gait score|health score|fall.risk|patient|signed in|sign in|login|create account|profile|settings/i);
+  assert.equal(h.controls[1].accessibilityLabel, 'Email account');
+  h.controls[1].onPress();
+  assert.deepEqual(h.pushes, ['/account']);
   assert.doesNotMatch(source('src/home/HomeScreen.tsx'), /OfflineCapture|CameraView|Pose\.|@\/components\/ui|WebApp|firebase|authenticate|loggedIn/);
 });
 

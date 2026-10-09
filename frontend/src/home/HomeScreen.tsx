@@ -27,6 +27,13 @@ export default function HomeScreen() {
       throw error;
     }
   };
+  const openAccount = () => {
+    if (opening.current) return;
+    opening.current = true;
+    setStarting(true);
+    try { router.push('/account'); }
+    catch (error) { opening.current = false; setStarting(false); throw error; }
+  };
 
   return <SafeAreaView style={styles.page}>
     <ScrollView contentContainerStyle={styles.content}>
@@ -60,6 +67,11 @@ export default function HomeScreen() {
         <Text accessibilityRole="header" style={styles.noteTitle}>For research, not diagnosis</Text>
         <Text style={styles.noteText}>Scientific status: not evaluated. GaitSense is not clinically validated and does not provide a diagnosis or treatment guidance.</Text>
       </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Email account" onPress={openAccount} disabled={starting}
+        accessibilityState={{ disabled: starting }}
+        style={styles.accountButton}>
+        <Text style={styles.accountText}>Email account</Text>
+      </Pressable>
     </ScrollView>
   </SafeAreaView>;
 }
@@ -85,4 +97,6 @@ const styles = StyleSheet.create({
   researchNote: { gap: 8, paddingHorizontal: 4 },
   noteTitle: { color: colors.ink, fontSize: 16, fontWeight: '700' },
   noteText: { color: colors.inkMuted, fontSize: 14, lineHeight: 22 },
+  accountButton: { minHeight: 48, padding: 14, borderWidth: 1, borderColor: colors.primaryDark, borderRadius: radii.md, alignItems: 'center' },
+  accountText: { color: colors.primaryDark, fontSize: 16, fontWeight: '600' },
 });
