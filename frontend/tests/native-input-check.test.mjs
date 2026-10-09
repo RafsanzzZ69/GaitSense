@@ -8,15 +8,20 @@ const releasePath = 'android/app/src/release/AndroidManifest.xml';
 const mainPath = 'android/app/src/main/AndroidManifest.xml';
 const sdkPath = 'android/gradle.properties';
 const modulePath = 'modules/gaitsense-pose/expo-module.config.json';
+const firebaseFixture = JSON.stringify({ project_info: { project_id: 'unit-fixture', project_number: '123' }, client: [{ client_info: { android_client_info: { package_name: 'com.gaitsense.research' }, mobilesdk_app_id: '1:123:android:fixture' }, api_key: [{ current_key: 'unit-fixture-only' }] }] });
 // Generated inputs are fixture values, so the full source suite also works in a
 // checkout without ignored Android output/model assets. CLI acceptance hashes
 // the actual model separately; these tests exercise its pinned digest gate.
 function inputs(overrides = {}) {
   const fixtures = {
-    [releasePath]: '<manifest><uses-permission android:name="android.permission.INTERNET" tools:node="remove"/><uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"/></manifest>',
-    [mainPath]: '<manifest><uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove"/><application android:allowBackup="false"/></manifest>',
-    [sdkPath]: 'android.minSdkVersion=26\n',
+    [releasePath]: '<manifest><uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"/></manifest>',
+    [mainPath]: '<manifest><uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove"/>' + ['READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE'].map(permission => `<uses-permission android:name="android.permission.${permission}" tools:node="remove"/>`).join('') + '<application android:allowBackup="false"/></manifest>',
+    [sdkPath]: 'android.minSdkVersion=26\norg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=1024m\n',
     [modulePath]: JSON.stringify({ android: { modules: ['expo.modules.gaitsensepose.GaitSensePoseModule'] } }),
+    'google-services.json': firebaseFixture,
+    'android/app/google-services.json': firebaseFixture,
+    'android/build.gradle': "buildscript { dependencies { classpath 'com.google.gms:google-services:4.5.0' } }",
+    'android/app/build.gradle': "apply plugin: 'com.google.gms.google-services'",
     ...overrides,
   };
   return path => Object.hasOwn(fixtures, path) ? fixtures[path] : readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -75,15 +80,30 @@ for (const route of ['assess', 'dashboard', 'history', 'profile', 'login', 'regi
 }
 
 for (const [name, overrides] of [
-  ['release INTERNET removal', { [releasePath]: inputs()(releasePath).replace('android.permission.INTERNET', 'android.permission.VIBRATE') }],
+  ['release authentication networking', { [releasePath]: inputs()(releasePath).replace('</manifest>', '<uses-permission android:name="android.permission.INTERNET" tools:node="remove"/></manifest>') }],
+  ['main INTERNET permission', { [mainPath]: inputs()(mainPath).replace('android.permission.INTERNET', 'android.permission.VIBRATE') }],
   ['release overlay permission removal', { [releasePath]: inputs()(releasePath).replace('android.permission.SYSTEM_ALERT_WINDOW', 'android.permission.VIBRATE') }],
   ['backup disabled', { [mainPath]: inputs()(mainPath).replace('allowBackup="false"', 'allowBackup="true"') }],
   ['audio permission removal', { [mainPath]: inputs()(mainPath).replace('RECORD_AUDIO', 'VIBRATE') }],
   ['API 26 floor', { [sdkPath]: 'android.minSdkVersion=25\n' }],
+  ['bounded Gradle Metaspace budget', { [sdkPath]: inputs()(sdkPath).replace('MaxMetaspaceSize=1024m', 'MaxMetaspaceSize=512m') }],
   ['native module declaration', { [modulePath]: JSON.stringify({ android: { modules: [] } }) }],
 ]) {
   test(`native preflight retains ${name}`, () => assert.throws(() => check(overrides)));
 }
+
+for (const permission of ['READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE']) {
+  test(`native preflight retains ${permission} removal`, () => assert.throws(() => check({ [mainPath]: source(mainPath).replace(permission, 'VIBRATE') })));
+}
+for (const path of ['android/build.gradle', 'android/app/build.gradle']) {
+  test(`native preflight rejects missing/duplicate Google services in ${path}`, () => {
+    assert.throws(() => check({ [path]: '' }), /exactly once/);
+    assert.throws(() => check({ [path]: source(path) + '\n' + source(path) }), /exactly once/);
+  });
+}
+test('generated client config must match provisioning without exposing its contents', () => {
+  assert.throws(() => check({ 'android/app/google-services.json': 'different' }), /match owner-provisioned/);
+});
 
 test('bundled model digest must match the pinned model', () => {
   assert.throws(() => check({}, '0'.repeat(64)), /Assertion/);

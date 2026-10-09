@@ -5,6 +5,18 @@ Latest diagnostic build: **user-reported Sprint 5 physical acceptance PASS** on
 **NOT_EVALUATED**. The earlier build/test sections below retain historical
 results, artifact hashes and then-pending checks; they are not current status.
 
+## Current authentication-capable build policy — Phase 2C
+
+The Firebase App/Auth native-base checkpoint permits INTERNET for account
+authentication. Android grants this permission to the whole process, not only
+one library. No gait networking/upload code is added: capture, bundled MediaPipe,
+SQLite History and saved analysis remain local/offline. Microphone, broad
+storage/media and overlay permissions remain excluded; backup stays disabled.
+Earlier physically accepted binaries and the frozen pre-auth Home candidate
+had no INTERNET permission; that evidence remains historical. This checkpoint
+does not implement login/session UI or establish physical authentication or
+Phase 1 Home acceptance. See the [Firebase readiness record](planning/FIREBASE_AUTH_IMPLEMENTATION_READINESS.md).
+
 ## Diagnostic-build physical acceptance — 8 October 2026
 
 Recorded on 9 October 2026 from the owner's supplied acceptance account, including
@@ -131,8 +143,9 @@ evaluation remain separate gates before scientific collection/evaluation.
   per-session/all-session deletion and failed-attempt rollback.
 - Temporary source deleted before successful result commit; failure/cancellation
   cleaned by UI. Explicit cleanup control for recordings left by force-close.
-- App backup disabled in main manifest; release-only overlay removes INTERNET
-  and SYSTEM_ALERT_WINDOW. Debug builds keep Metro connectivity.
+- App backup disabled in main manifest; release-only overlay removes
+  SYSTEM_ALERT_WINDOW. Auth-capable builds permit INTERNET; historical pre-auth
+  binaries removed it. Debug builds keep Metro connectivity.
 
 Implementation alone is not evidence of native execution; the latest user-reported
 physical evidence is scoped above. This is
@@ -333,7 +346,7 @@ before resuming. See CURRENT_STATE.md and ignored physical-device-verification l
 | Too-short/no-person/multi-person/occluded recording | Retake message, no scored or fake result |
 | Delete one/all | Session and all frame rows removed after restart |
 | Clear leftovers after interrupted recording | Only this app's Camera-cache videos removed |
-| Inspect final merged release manifest and network behavior | No INTERNET permission; no uploads |
+| Inspect final merged release manifest and network behavior | Auth-capable INTERNET permitted; no gait uploads; earlier no-INTERNET binaries remain historical evidence |
 | Two physical phone tiers, orientation/decoder checks | Log CPU/OS, latency, rotation, memory, heat and failures |
 
 Known limitations: fixed portrait UI and 720p prototype differ from the draft

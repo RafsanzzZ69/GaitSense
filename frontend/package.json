@@ -5,6 +5,8 @@
   "dependencies": {
     "@expo/ui": "~57.0.9",
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-firebase/app": "26.4.0",
+    "@react-native-firebase/auth": "26.4.0",
     "expo": "~57.0.11",
     "expo-camera": "~57.0.3",
     "expo-constants": "~57.0.9",

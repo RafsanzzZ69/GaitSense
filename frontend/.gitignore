@@ -41,6 +41,8 @@ example
 # generated native folders
 /ios
 /android
+# Official Firebase Android client configuration: provision locally.
+/google-services.json
 # Public showcase export (generated)
 dist-showcase/
 dist-android-check/
