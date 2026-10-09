@@ -1,6 +1,6 @@
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, reload,
+  signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, reload, signOut,
   type User,
 } from '@react-native-firebase/auth';
 import type { AuthAdapter, PublicUser } from './auth-types';
@@ -17,6 +17,7 @@ export const authAdapter: AuthAdapter = {
   register: async (email, password) => (await createUserWithEmailAndPassword(getAuth(), email, password)).user.uid,
   login: async (email, password) => { await signInWithEmailAndPassword(getAuth(), email, password); },
   reset: email => sendPasswordResetEmail(getAuth(), email),
+  signOut: () => signOut(getAuth()),
   verify: async expectedUid => {
     const user = getAuth().currentUser;
     if (!user || (expectedUid && user.uid !== expectedUid)) throw new Error('Identity changed');

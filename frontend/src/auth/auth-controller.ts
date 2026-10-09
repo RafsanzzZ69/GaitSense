@@ -1,5 +1,6 @@
 import { authErrorMessage, resetConfirmation, validateAuthForm } from './auth-errors';
 import type { AuthAdapter, AuthOperation, AuthState, OperationResult, PublicUser } from './auth-types';
+import type { DepartureBoundary } from '../navigation/departure-boundary';
 
 export function createAuthController(adapter: AuthAdapter, now = Date.now) {
   let state: AuthState = { session: { status: 'RESTORING', user: null }, busy: null };
@@ -7,13 +8,19 @@ export function createAuthController(adapter: AuthAdapter, now = Date.now) {
   let active = false;
   let generation = 0;
   let lastVerification: { uid: string; at: number } | null = null;
+  let endDeparture: (() => void) | null = null;
+  let endSignOutWait: (() => void) | null = null;
   const observers = new Set<() => void>();
+  const getSnapshot = (): AuthState => state;
   const publish = (next: AuthState) => { state = next; observers.forEach(observer => observer()); };
-  const resolve = (user: PublicUser | null) => publish({ ...state, session: user
+  const resolve = (user: PublicUser | null) => publish({ ...state,
+    signOutMessage: user?.uid === state.session.user?.uid ? state.signOutMessage : undefined, session: user
     ? { status: 'SIGNED_IN', user } : { status: 'SIGNED_OUT', user: null } });
   function stop() {
     active = false;
     generation++;
+    endDeparture?.();
+    endSignOutWait?.();
     const cleanup = unsubscribe;
     unsubscribe = null;
     cleanup?.();
@@ -33,7 +40,7 @@ export function createAuthController(adapter: AuthAdapter, now = Date.now) {
       publish({ session: { status: 'ERROR', user: null }, busy: null });
     }
   }
-  async function run(operation: AuthOperation, email = '', password = '', confirmation = ''): Promise<OperationResult> {
+  async function run(operation: Exclude<AuthOperation, 'signout'>, email = '', password = '', confirmation = ''): Promise<OperationResult> {
     if (!active || state.session.status === 'RESTORING' || state.session.status === 'ERROR') {
       return { ok: false, message: 'Account access is not ready. Please try again.' };
     }
@@ -87,7 +94,46 @@ export function createAuthController(adapter: AuthAdapter, now = Date.now) {
     }
     return active && current === generation ? result : { ok: false, message: 'Account operation ended.' };
   }
-  return { getSnapshot: () => state, subscribe: (observer: () => void) => {
+  async function requestSignOut(boundary: DepartureBoundary): Promise<OperationResult> {
+    if (!active || state.session.status !== 'SIGNED_IN' || state.busy) {
+      return { ok: false, message: 'Account access is busy or no account is signed in.' };
+    }
+    const current = generation;
+    const uid = state.session.user.uid;
+    publish({ ...state, busy: 'signout', signOutMessage: undefined });
+    const departure = boundary.requestDeparture();
+    endDeparture = departure.release;
+    try {
+      if (!await departure.ready || !active || current !== generation || state.session.user?.uid !== uid) {
+        return { ok: false, message: 'The account operation ended.' };
+      }
+      await adapter.signOut();
+      // Command completion does not establish signed-out truth. Keep the latch
+      // and new-work block until the existing native listener changes identity.
+      if (active && current === generation && state.session.user?.uid === uid) {
+        await new Promise<void>(done => {
+          const changed = () => {
+            if (!active || current !== generation || state.session.user?.uid !== uid) {
+              observers.delete(changed); endSignOutWait = null; done();
+            }
+          };
+          endSignOutWait = () => { observers.delete(changed); done(); };
+          observers.add(changed);
+          changed();
+        });
+      }
+      return { ok: active && current === generation && getSnapshot().session.status === 'SIGNED_OUT', message: 'Account session changed.' };
+    } catch {
+      const message = 'Unable to sign out. Please try again.';
+      if (active && current === generation && state.session.user?.uid === uid) publish({ ...state, signOutMessage: message });
+      return { ok: false, message };
+    } finally {
+      departure.release();
+      if (endDeparture === departure.release) endDeparture = null;
+      if (active && current === generation) publish({ ...state, busy: null });
+    }
+  }
+  return { getSnapshot, subscribe: (observer: () => void) => {
     observers.add(observer); return () => { observers.delete(observer); };
-  }, start, stop, retry: () => { stop(); start(); }, run };
+  }, start, stop, retry: () => { stop(); start(); }, run, requestSignOut };
 }

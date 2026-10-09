@@ -9,7 +9,7 @@ export type PublicUser = Readonly<{
 export type Session =
   | { status: 'RESTORING' | 'SIGNED_OUT' | 'ERROR'; user: null }
   | { status: 'SIGNED_IN'; user: PublicUser };
-export type AuthOperation = 'register' | 'login' | 'reset' | 'resend' | 'refresh';
+export type AuthOperation = 'register' | 'login' | 'reset' | 'resend' | 'refresh' | 'signout';
 export type OperationResult = { ok: boolean; message: string };
 export interface AuthAdapter {
   subscribe(next: (user: PublicUser | null) => void, error: () => void): () => void;
@@ -18,5 +18,6 @@ export interface AuthAdapter {
   reset(email: string): Promise<void>;
   verify(expectedUid?: string): Promise<void>;
   refresh(): Promise<PublicUser | null>;
+  signOut(): Promise<void>;
 }
-export type AuthState = { session: Session; busy: AuthOperation | null };
+export type AuthState = { session: Session; busy: AuthOperation | null; signOutMessage?: string };

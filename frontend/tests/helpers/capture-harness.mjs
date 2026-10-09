@@ -24,11 +24,11 @@ function component(path, replacements) {
   return module.exports;
 }
 
-export function capture(navigationBoundary) {
+export function capture(navigationBoundary, localSessions = []) {
   const states = [], refs = [], effects = [], callbacks = [], discarded = [], destroyed = [];
   let stateIndex = 0, refIndex = 0, effectIndex = 0, callbackIndex = 0, access, clipResolve, processResolve, cleanupFails = false;
   const camera = { recordAsync: () => new Promise(resolve => { clipResolve = resolve; }), stopRecording() {} };
-  const pose = { listSessions: async () => '[]', cancel() {}, addListener: () => ({ remove() {} }),
+  const pose = { listSessions: async () => JSON.stringify(localSessions), cancel() {}, addListener: () => ({ remove() {} }),
     deleteSession: () => destroyed.push('session'), deleteAll: () => destroyed.push('all'),
     discardVideo: async uri => { discarded.push(uri); if (cleanupFails) throw Error('synthetic cleanup failure'); },
     processVideoWithSetup: () => new Promise(resolve => { processResolve = resolve; }) };
@@ -68,6 +68,7 @@ export function capture(navigationBoundary) {
   find(n => n.props.accessibilityRole === 'checkbox', tree).props.onPress();
   render();
   return { render, canLeave: () => access.canLeave(), idle: () => access.idle,
+    hasSession: id => !!find(n => n.props.accessibilityLabel === `View saved analysis for session ${id}`, tree),
     press: label => find(n => n.props.label === label, tree).props.onPress(),
     control: label => find(n => n.props.label === label, tree).props,
     resolveClip: () => clipResolve({ uri: 'file:///cache/Camera/synthetic.mp4' }),

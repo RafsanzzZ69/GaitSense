@@ -3,10 +3,30 @@
 export function createDepartureBoundary(isEntryAllowed: () => boolean) {
   let owner: (() => boolean) | null = null;
   let revision = 0;
+  const departures = new Set<{ resolve: (safe: boolean) => void; settled: boolean }>();
   const observers = new Set<() => void>();
-  const changed = () => { revision++; observers.forEach(observer => observer()); };
+  const changed = () => {
+    if (!owner || owner()) for (const departure of departures) {
+      if (!departure.settled) { departure.settled = true; departure.resolve(true); }
+    }
+    revision++; observers.forEach(observer => observer());
+  };
   return {
-    canStart: isEntryAllowed,
+    canStart: () => departures.size === 0 && isEntryAllowed(),
+    isPending: () => departures.size > 0,
+    requestDeparture() {
+      let resolve!: (safe: boolean) => void;
+      const ready = new Promise<boolean>(done => { resolve = done; });
+      const departure = { resolve, settled: false };
+      departures.add(departure);
+      changed();
+      return { ready, release() {
+        if (departures.delete(departure)) {
+          if (!departure.settled) { departure.settled = true; resolve(false); }
+          changed();
+        }
+      } };
+    },
     mustRetain: () => owner !== null && !owner(),
     changed,
     register(canLeave: () => boolean) {

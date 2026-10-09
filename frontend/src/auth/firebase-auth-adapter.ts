@@ -5,5 +5,5 @@ const unavailable = async (): Promise<never> => { throw new Error('Native Androi
 export const authAdapter: AuthAdapter = {
   subscribe: () => { throw new Error('Native Android authentication required'); },
   register: unavailable, login: unavailable, reset: unavailable,
-  verify: unavailable, refresh: unavailable,
+  verify: unavailable, refresh: unavailable, signOut: unavailable,
 };

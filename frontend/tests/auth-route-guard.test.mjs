@@ -89,6 +89,37 @@ test('an admitted unsafe owner retains only offline; auth and other routes canno
   assert.deepEqual(h.routes(), ['offline']); assert.equal(h.boundary.canStart(), false);
   safe = true; h.boundary.changed(); assert.deepEqual(h.routes(), ['account']); release();
 });
+
+test('pending sign-out retains the unsafe owner while Firebase still reports SIGNED_IN', async () => {
+  const h = gate('SIGNED_IN'); let safe = false; h.boundary.register(() => safe);
+  const departure = h.boundary.requestDeparture(); assert.deepEqual(h.routes(), ['offline']);
+  assert.equal(h.auth.session.status, 'SIGNED_IN'); assert.equal(h.boundary.canStart(), false);
+  safe = true; h.boundary.changed(); assert.equal(await departure.ready, true);
+  assert.deepEqual(h.routes(), ['account']);
+  h.auth.session = { status: 'SIGNED_OUT', user: null }; departure.release(); assert.deepEqual(h.routes(), ['account']);
+});
+
+test('safe sign-out waiting for listener cannot reopen Home or mount a fresh camera', async () => {
+  const h = gate('SIGNED_IN'); const departure = h.boundary.requestDeparture();
+  assert.equal(await departure.ready, true); assert.deepEqual(h.routes(), ['account']);
+  departure.release(); assert.equal(h.routes()[0], 'index');
+});
+
+test('pending sign-out prunes covering routes while preserving the admitted workspace route key', () => {
+  const h = gate('SIGNED_IN'); const { StackRouter } = require('expo-router/build/react-navigation/routers/StackRouter');
+  const router = StackRouter({}); let options = { routeNames: h.routes(), routeParamList: {}, routeGetIdList: {}, routeKeyChanges: [] };
+  let state = router.getInitialState(options);
+  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'offline' } }, options);
+  const ownerKey = state.routes.at(-1).key;
+  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'account' } }, options);
+  let safe = false; h.boundary.register(() => safe); const departure = h.boundary.requestDeparture();
+  options = { ...options, routeNames: h.routes() }; state = router.getStateForRouteNamesChange(state, options);
+  assert.deepEqual(state.routes.map(route => route.name), ['offline']); assert.equal(state.routes[0].key, ownerKey);
+  assert.equal(router.getStateForAction(state, { type: 'POP', payload: { count: 1 } }, options), null);
+  safe = true; h.boundary.changed(); options = { ...options, routeNames: h.routes() };
+  state = router.getStateForRouteNamesChange(state, options); assert.deepEqual(state.routes.map(route => route.name), ['account']);
+  h.auth.session = { status: 'SIGNED_OUT', user: null }; departure.release(); assert.deepEqual(h.routes(), ['account']);
+});
 test('ERROR/restoration during an admitted attempt retains settlement, then closes entry safely', () => {
   for (const status of ['ERROR', 'RESTORING']) {
     const h = gate('SIGNED_IN'); let safe = false; h.boundary.register(() => safe); h.auth.session = { status, user: null };
@@ -115,5 +146,5 @@ test('web route/layout and measurement layer do not acquire Firebase or account 
   const native = read('modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt');
   assert.doesNotMatch(native, /Firebase|firebase|\bUID\b/);
   const auth = readdirSync(new URL('../src/auth/', import.meta.url)).map(name => read('src/auth/' + name)).join('\n');
-  assert.doesNotMatch(auth, /console\.|getIdToken|AsyncStorage|SecureStore|localStorage|signOut|deleteUser|GoogleAuthProvider|linkWithCredential/);
+  assert.doesNotMatch(auth, /console\.|getIdToken|AsyncStorage|SecureStore|localStorage|deleteUser|GoogleAuthProvider|linkWithCredential/);
 });

@@ -37,7 +37,7 @@ export function MeasurementWorkspaceHeader({ canLeave, idle, onHome, pendingDepa
     <View style={styles.copy}>
       <Text accessibilityRole="header" style={styles.title}>Gait Measurement</Text>
       <Text style={styles.subtitle}>{idle ? 'Recording and saved measurements' : 'Finish or discard this attempt to return Home'}</Text>
-      {pendingDeparture && <Text accessibilityRole="alert" style={styles.subtitle}>Account access changed. Finish or cancel this attempt, then discard any retained video. You will return to account access after cleanup. New recordings are blocked.</Text>}
+      {pendingDeparture && <Text accessibilityRole="alert" style={styles.subtitle}>Account departure pending. Finish or cancel this attempt, then discard any retained video. Account operations will continue after cleanup. New recordings are blocked.</Text>}
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Return to Home"
       accessibilityState={{ disabled: !idle }} disabled={!idle} onPress={requestHome}

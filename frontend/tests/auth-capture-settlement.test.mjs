@@ -71,5 +71,5 @@ test('settlement refuses a second simultaneous measurement owner and unregisters
 test('boundary observes same-tick locks and leaves data services outside its contract', () => {
   const b = createDepartureBoundary(() => false); let locked = false; b.register(() => !locked);
   assert.equal(b.mustRetain(), false); locked = true; assert.equal(b.mustRetain(), true);
-  assert.deepEqual(Object.keys(b).sort(), ['canStart', 'changed', 'getSnapshot', 'mustRetain', 'register', 'subscribe']);
+  assert.deepEqual(Object.keys(b).sort(), ['canStart', 'changed', 'getSnapshot', 'isPending', 'mustRetain', 'register', 'requestDeparture', 'subscribe']);
 });

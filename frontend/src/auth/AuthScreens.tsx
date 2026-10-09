@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii } from '@/constants/theme';
 import { useAuth } from './useAuth';
 import { validateAuthForm } from './auth-errors';
 import type { AuthOperation } from './auth-types';
+import { useNavigationSettlement } from '@/navigation/NavigationSettlement';
 
 type Mode = 'welcome' | 'login' | 'register' | 'reset' | 'verification';
 export const authRoutes = {
@@ -26,6 +27,7 @@ function Button({ title, onPress, disabled = false, secondary = false }: {
 export function AuthScreen({ mode }: { mode: Mode }) {
   const auth = useAuth();
   const router = useRouter();
+  const boundary = useNavigationSettlement();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -35,6 +37,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
   const mounted = useRef(true);
   const pending = useRef(false);
   const navigated = useRef(false);
+  const confirming = useRef<object | null>(null);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const leaveForms = (verification = false) => {
     // Clear the independent account stack; never push Home over a gait owner.
@@ -48,7 +51,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     }
   }, [mode, auth.session, auth.busy]);
   const blocked = submitting || auth.busy !== null || auth.session.status === 'RESTORING' || auth.session.status === 'ERROR';
-  const execute = async (operation: AuthOperation) => {
+  const execute = async (operation: Exclude<AuthOperation, 'signout'>) => {
     if (pending.current || blocked) return;
     if (operation === 'register' || operation === 'login' || operation === 'reset') {
       const invalid = validateAuthForm(operation, email, password, confirmation);
@@ -64,6 +67,26 @@ export function AuthScreen({ mode }: { mode: Mode }) {
       pending.current = false;
       if (mounted.current) setSubmitting(false);
     }
+  };
+  const confirmSignOut = () => {
+    if (confirming.current || pending.current || blocked || auth.session.status !== 'SIGNED_IN') return;
+    const confirmationRequest = {};
+    confirming.current = confirmationRequest;
+    const uid = auth.session.user.uid;
+    const cancel = () => { if (confirming.current === confirmationRequest) confirming.current = null; };
+    Alert.alert('Sign out of GaitSense?',
+      'Your account session will be signed out. Measurements stored on this phone remain here and are shared across accounts on this device.', [
+        { text: 'Cancel', style: 'cancel', onPress: cancel },
+        { text: 'Sign out', onPress: () => {
+          if (confirming.current !== confirmationRequest) return;
+          confirming.current = null;
+          if (!mounted.current || pending.current || auth.getSnapshot().session.user?.uid !== uid || auth.getSnapshot().busy) return;
+          pending.current = true;
+          // This provider-owned operation survives Account unmount while the
+          // existing workspace settles. Route protection handles the SDK result.
+          void auth.requestSignOut(boundary).finally(() => { pending.current = false; });
+        } },
+      ], { cancelable: true, onDismiss: cancel });
   };
   const heading = { welcome: 'Welcome to GaitSense', login: 'Sign in with email', register: 'Create your account', reset: 'Reset your password', verification: 'Verify your email' }[mode];
   const field = (label: string, value: string, change: (value: string) => void, kind: 'email' | 'password' | 'confirmation') => <View style={styles.field}>
@@ -87,7 +110,10 @@ export function AuthScreen({ mode }: { mode: Mode }) {
         {mode === 'welcome' && (auth.session.status === 'SIGNED_IN' ? <>
           <Text style={styles.body}>An account is signed in on this phone.</Text>
           {!auth.session.user.emailVerified && <Button title="Email verification" onPress={() => router.push(authRoutes.verification)} disabled={blocked} />}
-          <Button title="Continue to local app" onPress={() => leaveForms()} />
+          <Button title="Continue to local app" onPress={() => leaveForms()} disabled={blocked} />
+          <Button title="Sign out" onPress={confirmSignOut} disabled={blocked} secondary />
+          {auth.busy === 'signout' && <Text style={styles.body}>Sign-out requested. If a measurement is active, finish or cancel it and complete video cleanup first. Waiting for account session removal.</Text>}
+          {auth.signOutMessage && <Text accessibilityRole="alert" style={styles.message}>{auth.signOutMessage}</Text>}
         </> : <>
           <Button title="Sign in with email" onPress={() => router.push(authRoutes.login)} disabled={blocked} />
           <Button title="Create account" onPress={() => router.push(authRoutes.register)} disabled={blocked} secondary />
@@ -108,7 +134,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           {!auth.session.user.emailVerified && <Button title="Resend verification email" disabled={blocked} onPress={() => void execute('resend')} />}
           <Button title="I have verified — refresh" disabled={blocked} onPress={() => void execute('refresh')} secondary />
           <Text style={styles.body}>Resending and refreshing need internet. Continue locally at any time.</Text>
-          <Button title="Continue to local app" onPress={() => leaveForms()} secondary />
+          <Button title="Continue to local app" onPress={() => leaveForms()} disabled={auth.busy === 'signout'} secondary />
         </> : <Text style={styles.body}>Sign in with email to manage email verification.</Text>)}
         {message !== '' && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.message}>{message}</Text>}
         {auth.busy && <ActivityIndicator accessibilityLabel="Account operation in progress" />}

@@ -17,7 +17,7 @@ export function AndroidAuthGate() {
   useSyncExternalStore(boundary.subscribe, boundary.getSnapshot, boundary.getSnapshot);
   useEffect(() => { boundary.changed(); }, [boundary, auth.session.status]);
   const signedIn = auth.session.status === 'SIGNED_IN';
-  const retaining = !signedIn && boundary.mustRetain();
+  const retaining = (!signedIn || boundary.isPending()) && boundary.mustRetain();
   const unresolved = auth.session.status === 'RESTORING' || auth.session.status === 'ERROR';
   return <NavigationSettlementContext.Provider value={boundary}>
     {unresolved && !retaining ? <SafeAreaView style={styles.page}>
@@ -34,10 +34,10 @@ export function AndroidAuthGate() {
         <Text style={styles.buttonText}>Retry account access</Text>
       </Pressable>
     </SafeAreaView> : <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-      <Stack.Protected guard={signedIn}>
+      <Stack.Protected guard={signedIn && !boundary.isPending() && !retaining}>
         {protectedAppRoutes.map(name => <Stack.Screen key={name} name={name} />)}
       </Stack.Protected>
-      <Stack.Protected guard={signedIn || retaining}>
+      <Stack.Protected guard={(signedIn && !boundary.isPending()) || retaining}>
         <Stack.Screen name="offline" dangerouslySingular={() => 'gaitsense-measurement'} />
       </Stack.Protected>
       {/* While settlement is pending, no other destination can cover the owner. */}
