@@ -14,6 +14,7 @@ import {presentSavedAnalysis} from '../src/offline/analysis-presentation.ts';
 import * as setupModule from '../src/offline/recording-analysis-setup.ts';
 import * as contract from '../src/offline/contract.ts';
 import * as framing from '../src/offline/framing.ts';
+import * as savedBinding from '../src/offline/saved-analysis-binding.ts';
 const require=createRequire(import.meta.url),web=require('react-native-web');
 const golden=JSON.parse(readFileSync(new URL('./fixtures/analysis-metadata-v2.json',import.meta.url),'utf8'));
 function fixture(metadata=structuredClone(golden),view='side_left') {
@@ -175,33 +176,50 @@ test('actual capture/native wiring snapshots before countdown and passes the sam
 
 // Controlled hooks execute the real capture handlers without a native camera or a
 // React scheduler. This checks request/lifetime wiring, not Android rendering.
-function captureHarness({processingFails=false,processingError='synthetic read failure'}={}) {
+function captureHarness({processingFails=false,processingError='synthetic read failure',processingOutcomes=null,sessionStore=null,readFramesOverride=null}={}) {
  const states=[],refs=[],effects=[],requests=[],discarded=[];let stateIndex=0,refIndex=0,nullRefs=0;
- let resolveClip,rejectClip;const clip=new Promise((resolve,reject)=>{resolveClip=resolve;rejectClip=reject;});
- const camera={recordAsync:()=>clip,stopRecording(){}};
+ const recordings=[],alerts=[],deleted=[];
+ const camera={recordAsync:()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});recordings.push({resolve,reject});return promise;},stopRecording(){}};
  let cleanupFails=false;
- const f=fixture();const pose={listSessions:async()=>JSON.stringify([f.session]),readFrames:async()=>JSON.stringify(f.frames),cancel(){},
+ const f=fixture(),store=sessionStore??new Map([[f.session.id,f]]);
+ const pose={listSessions:async()=>JSON.stringify([...store.values()].map(value=>value.session)),
+  readFrames:async id=>readFramesOverride?readFramesOverride(id):JSON.stringify(store.get(id)?.frames??[]),cancel(){},
+  deleteSession:async id=>{deleted.push(id);store.delete(id);},
   addListener:()=>({remove(){}}),discardVideo:async uri=>{discarded.push(uri);if(cleanupFails)throw Error('synthetic cleanup failure');},
-  processVideoWithSetup:async(...args)=>{requests.push(args);if(processingFails)throw Error(processingError);return JSON.stringify(f.session);}};
+  processVideoWithSetup:async(...args)=>{requests.push(args);const outcome=processingOutcomes?.[requests.length-1];
+   if(outcome instanceof Error)throw outcome;if(processingFails)throw Error(processingError);
+   const saved=outcome??f;if(sessionStore)store.set(saved.session.id,saved);return JSON.stringify(saved.session);}};
  const react={...React,useState:initial=>{const i=stateIndex++;if(!(i in states))states[i]=initial;
    return [states[i],value=>{states[i]=typeof value==='function'?value(states[i]):value;}];},
   useRef:initial=>{const i=refIndex++;if(!refs[i]){refs[i]={current:initial};if(initial===null&&++nullRefs===2)refs[i].current=camera;}return refs[i];},
   useEffect:fn=>{effects.push(fn);},useCallback:fn=>fn};
- const native={...web,useWindowDimensions:()=>({width:320,height:640}),AppState:{addEventListener:()=>({remove(){}})}};
+ const native={...web,Alert:{alert:(title,message,buttons)=>alerts.push({title,message,buttons})},
+  useWindowDimensions:()=>({width:320,height:640}),AppState:{addEventListener:()=>({remove(){}})}};
  function Setup() {return null;}
+ function Panel() {return null;}
  const Capture=component('OfflineCapture.tsx',{react,'react-native':native,'expo-camera':{useCameraPermissions:()=>[{granted:true},()=>{}],CameraView:()=>null},
-  'expo-video':{useVideoPlayer:()=>null,VideoView:()=>null},'expo-router':{useFocusEffect(){}},'react-native-safe-area-context':{SafeAreaView:web.View},
-  '../../modules/gaitsense-pose':{__esModule:true,default:pose},'./contract':contract,'./framing':framing,'./saved-analysis-binding':{},'./SavedAnalysisPanel':{SavedAnalysisPanel:()=>null},
+  'expo-video':{useVideoPlayer:()=>null,VideoView:()=>null},'expo-router':{useFocusEffect:fn=>effects.push(fn)},'react-native-safe-area-context':{SafeAreaView:web.View},
+  '../../modules/gaitsense-pose':{__esModule:true,default:pose},'./contract':contract,'./framing':framing,'./saved-analysis-binding':savedBinding,'./SavedAnalysisPanel':{SavedAnalysisPanel:Panel},
   './recording-analysis-setup':setupModule,'./RecordingAnalysisSetupControls':{RecordingAnalysisSetupControls:Setup}}).default;
  let tree;function render(){stateIndex=refIndex=0;effects.length=0;tree=Capture();return tree;}
  function find(predicate,node){if(Array.isArray(node)){for(const child of node){const result=find(predicate,child);if(result)return result;}}
   else if(React.isValidElement(node)){if(predicate(node))return node;return find(predicate,node.props.children);}return null;}
  render();states[2]=true;states[3]=true;render();
  const cleanups=effects.map(fn=>fn()).filter(fn=>typeof fn==='function');
+ function texts(node){if(Array.isArray(node))return node.flatMap(texts);if(!React.isValidElement(node))return [];
+  return node.type===web.Text?[node.props.children]:texts(node.props.children);}
  return {render,setup:()=>find(n=>n.type===Setup,tree).props,error:()=>find(n=>n.props.accessibilityRole==='alert',tree)?.props.children,
   press:label=>find(n=>n.props.label===label,tree).props.onPress(),
+  hasAction:label=>!!find(n=>n.props.label===label,tree),enabled:label=>!find(n=>n.props.label===label,tree).props.disabled,
+  pressSession(label,id){const row=find(n=>React.Children.toArray(n.props.children).some(child=>React.isValidElement(child)&&child.props.accessibilityLabel===`View saved analysis for session ${id}`),tree);
+   assert.ok(row,`History row ${id} must exist`);return find(n=>n.props.label===label,row).props.onPress();},
+  chooseAlert:label=>alerts.at(-1).buttons.find(button=>button.text===label).onPress?.(),
+  historyCount:()=>{const text=texts(tree).find(value=>Array.isArray(value)&&value[0]==='On-device history (');return text[1];},
+  analysis:()=>find(n=>n.type===Panel,tree)?.props.presentation,
+  inspectionVisible:()=>texts(tree).includes('Saved landmark inspection'),
   side:label=>find(n=>n.props.accessibilityLabel===label,tree),
-  active:()=>refs.find(r=>r.current&&typeof r.current.start==='function').current.get(),resolveClip,rejectClip,requests,discarded,
+  active:()=>refs.find(r=>r.current&&typeof r.current.start==='function').current.get(),
+  resolveClip:value=>recordings.at(-1).resolve(value),rejectClip:error=>recordings.at(-1).reject(error),requests,discarded,recordings,deleted,
   failCleanup(value){cleanupFails=value;},cameraReady(){find(n=>typeof n.props.onCameraReady==='function',tree).props.onCameraReady();},
   unmount(){cleanups.forEach(fn=>fn());}};
 }
@@ -294,4 +312,108 @@ test('native quality wiring takes anatomical view only; metadata rotation and se
  assert.equal((native.match(/\brotation\b/g)||[]).length,3); // declaration, diagnostic key, interpolation only
  const parser=readFileSync(new URL('../modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/RecordingAnalysisSetup.kt',import.meta.url),'utf8');
  assert.doesNotMatch(parser,/side_left|side_right/);
+});
+
+// P0 handler recovery only. The native seam supplies rejection/success; these
+// tests do not implement MediaPipe quality decisions, Android SQLite or file IO.
+function namedFixture(id){const f=fixture();f.session.id=id;return f;}
+function recoveryStore(){const kept=namedFixture('synthetic-kept');return new Map([[kept.session.id,kept]]);}
+async function preview(h,uri){h.cameraReady();h.render();assert.equal(h.enabled('Record 15-second video'),true);
+ await start(h);h.render();h.press('Stop recording');h.resolveClip({uri});await flush();h.render();
+ assert.equal(h.hasAction('Extract landmarks on this phone'),true);}
+async function extract(h){h.press('Extract landmarks on this phone');await flush();h.render();}
+
+test('P0 countdown cancellation creates no session or camera request and a fresh attempt succeeds',async()=>{
+ const store=recoveryStore(),h=captureHarness({sessionStore:store,processingOutcomes:[namedFixture('synthetic-after-cancel')]});
+ await flush();h.setup().onDirection(-1);h.setup().onUpright(true);h.render();
+ const previous=globalThis.setTimeout,wakes=[];
+ try{globalThis.setTimeout=fn=>{wakes.push(fn);return 0;};
+  h.press('Record 15-second video');h.render();const snapshot=h.active();
+  h.press('Cancel countdown');assert.equal(wakes.length,1);wakes[0]();await flush();h.render();
+  assert.equal(h.active(),null);assert.deepEqual(snapshot,{view:'side_left',direction:-1,upright:true});
+ }finally{globalThis.setTimeout=previous;}
+ assert.equal(h.recordings.length,0);assert.equal(h.requests.length,0);assert.deepEqual([...store.keys()],['synthetic-kept']);
+ assert.equal(h.historyCount(),1);assert.equal(h.setup().direction,null);assert.equal(h.setup().upright,false);
+ h.press('Right side of the person');h.setup().onDirection(1);h.render();
+ await preview(h,'file:///cache/Camera/after-cancel.mp4');await extract(h);
+ assert.equal(h.requests.length,1);assert.equal(h.requests[0][1],'side_right');
+ assert.deepEqual(JSON.parse(h.requests[0][3]),{contractVersion:'recording-analysis-setup-1',direction:1,upright:null});
+ assert.equal(h.historyCount(),2);assert.equal(h.active(),null);assert.equal(h.setup().direction,null);
+ h.unmount();
+});
+
+test('P0 stopped preview is not saved; discard releases setup and the next attempt succeeds',async()=>{
+ const store=recoveryStore(),h=captureHarness({sessionStore:store,processingOutcomes:[namedFixture('synthetic-after-discard')]});
+ await flush();h.setup().onDirection(-1);h.setup().onUpright(true);h.render();
+ await preview(h,'file:///cache/Camera/disposable-preview.mp4');
+ assert.equal(h.historyCount(),1);assert.equal(h.requests.length,0);assert.equal(h.setup().disabled,true);
+ assert.equal(h.hasAction('Record 15-second video'),false);
+ h.press('Discard video / retake');await flush();h.render();
+ assert.deepEqual(h.discarded,['file:///cache/Camera/disposable-preview.mp4']);assert.equal(h.active(),null);
+ assert.equal(h.setup().direction,null);assert.equal(h.setup().upright,false);assert.equal(h.historyCount(),1);
+ await preview(h,'file:///cache/Camera/after-discard.mp4');await extract(h);
+ assert.deepEqual(JSON.parse(h.requests[0][3]),{contractVersion:'recording-analysis-setup-1',direction:null,upright:null});
+ assert.equal(h.historyCount(),2);assert.equal(h.setup().disabled,false);h.unmount();
+});
+
+for(const [caseName,message] of [
+ ['quality rejection','Required joints failed visibility/presence/bounds checks in more than 30% of sampled frames (70% required). Diagnostics: view=side_left; usable=0; poseFrames=0; noPose=100'],
+ ['processing failure','Synthetic decoder failure; no result saved'],
+])test(`P0 ${caseName} cleans the attempt, preserves History and allows a successful retry`,async()=>{
+ const store=recoveryStore(),kept=JSON.stringify(store.get('synthetic-kept'));
+ const h=captureHarness({sessionStore:store,processingOutcomes:[Error(message),namedFixture('synthetic-retry')]});
+ await flush();h.setup().onDirection(-1);h.setup().onUpright(true);h.render();
+ await preview(h,'file:///cache/Camera/rejected.mp4');await extract(h);
+ assert.equal(h.error(),message);assert.equal(h.active(),null);assert.equal(h.setup().disabled,false);
+ assert.equal(h.setup().direction,null);assert.equal(h.setup().upright,false);assert.equal(h.historyCount(),1);
+ assert.equal(h.inspectionVisible(),false);assert.equal(h.hasAction('Extract landmarks on this phone'),false);
+ assert.deepEqual(h.discarded,['file:///cache/Camera/rejected.mp4']);assert.deepEqual([...store.keys()],['synthetic-kept']);
+ h.press('Right side of the person');h.setup().onDirection(1);h.render();
+ await preview(h,'file:///cache/Camera/retry.mp4');await extract(h);
+ assert.equal(h.error(),undefined);assert.equal(h.requests.length,2);
+ assert.deepEqual(h.requests.map(request=>request[0]),['file:///cache/Camera/rejected.mp4','file:///cache/Camera/retry.mp4']);
+ assert.equal(h.requests[1][1],'side_right');
+ assert.deepEqual(JSON.parse(h.requests[1][3]),{contractVersion:'recording-analysis-setup-1',direction:1,upright:null});
+ assert.equal(h.historyCount(),2);assert.equal(h.inspectionVisible(),true);assert.equal(h.active(),null);
+ assert.equal(h.setup().direction,null);assert.equal(h.setup().upright,false);
+ assert.equal(JSON.stringify(store.get('synthetic-kept')),kept);h.unmount();
+});
+
+test('P0 processing cleanup failure retains its snapshot until discard, then a fresh attempt succeeds',async()=>{
+ const store=recoveryStore(),h=captureHarness({sessionStore:store,
+  processingOutcomes:[Error('Synthetic processing failure'),namedFixture('synthetic-after-cleanup')]});
+ await flush();h.setup().onDirection(-1);h.setup().onUpright(true);h.render();
+ await preview(h,'file:///cache/Camera/retained.mp4');const snapshot=h.active();
+ h.failCleanup(true);await extract(h);
+ assert.equal(h.error(),'synthetic cleanup failure');assert.equal(h.active(),snapshot);
+ assert.equal(h.setup().disabled,true);assert.equal(h.hasAction('Record 15-second video'),false);
+ assert.equal(h.historyCount(),1);assert.equal(h.inspectionVisible(),false);
+ h.failCleanup(false);h.press('Discard video / retake');await flush();h.render();
+ assert.equal(h.active(),null);assert.equal(h.setup().direction,null);assert.equal(h.setup().upright,false);
+ assert.deepEqual(h.discarded,['file:///cache/Camera/retained.mp4','file:///cache/Camera/retained.mp4']);
+ await preview(h,'file:///cache/Camera/after-cleanup.mp4');await extract(h);
+ assert.deepEqual(JSON.parse(h.requests[1][3]),{contractVersion:'recording-analysis-setup-1',direction:null,upright:null});
+ assert.equal(h.historyCount(),2);assert.deepEqual(snapshot,{view:'side_left',direction:-1,upright:true});h.unmount();
+});
+
+test('P0 selected deletion cancels safely, clears analysis/frames and cannot resurrect on late read or mock remount',async()=>{
+ const store=recoveryStore(),disposable=namedFixture('synthetic-disposable');store.set(disposable.session.id,disposable);
+ const before=JSON.stringify(store.get('synthetic-kept'));let defer=false,resolveRead;
+ const h=captureHarness({sessionStore:store,readFramesOverride:id=>defer&&id===disposable.session.id?
+  new Promise(resolve=>{resolveRead=resolve;}):JSON.stringify(store.get(id)?.frames??[])});
+ await flush();h.render();assert.equal(h.historyCount(),2);
+ h.pressSession('View saved analysis',disposable.session.id);await flush();h.render();
+ assert.equal(h.analysis().selection.sessionId,disposable.session.id);
+ h.pressSession('Read saved landmarks',disposable.session.id);await flush();h.render();assert.equal(h.inspectionVisible(),true);
+ h.pressSession('Delete this session',disposable.session.id);h.chooseAlert('Cancel');await flush();h.render();
+ assert.deepEqual(h.deleted,[]);assert.equal(h.historyCount(),2);assert.equal(h.analysis().selection.sessionId,disposable.session.id);
+ defer=true;h.pressSession('View saved analysis',disposable.session.id);await flush();h.render();assert.equal(h.analysis().status,'loading');
+ h.pressSession('Delete this session',disposable.session.id);h.chooseAlert('Delete');await flush();h.render();
+ assert.deepEqual(h.deleted,[disposable.session.id]);assert.equal(h.historyCount(),1);
+ assert.equal(h.analysis(),undefined);assert.equal(h.inspectionVisible(),false);assert.equal(store.has(disposable.session.id),false);
+ resolveRead(JSON.stringify(disposable.frames));await flush();h.render();assert.equal(h.analysis(),undefined);
+ assert.equal(JSON.stringify(store.get('synthetic-kept')),before);h.unmount();
+ const reopened=captureHarness({sessionStore:store});await flush();reopened.render();assert.equal(reopened.historyCount(),1);
+ reopened.pressSession('View saved analysis','synthetic-kept');await flush();reopened.render();
+ assert.equal(reopened.analysis().selection.sessionId,'synthetic-kept');assert.equal(reopened.analysis().dataStatus,'loaded');reopened.unmount();
 });
