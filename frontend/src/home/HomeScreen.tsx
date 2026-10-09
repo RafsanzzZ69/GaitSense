@@ -67,10 +67,10 @@ export default function HomeScreen() {
         <Text accessibilityRole="header" style={styles.noteTitle}>For research, not diagnosis</Text>
         <Text style={styles.noteText}>Scientific status: not evaluated. GaitSense is not clinically validated and does not provide a diagnosis or treatment guidance.</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Email account" onPress={openAccount} disabled={starting}
+      <Pressable accessibilityRole="button" accessibilityLabel="Account" onPress={openAccount} disabled={starting}
         accessibilityState={{ disabled: starting }}
         style={styles.accountButton}>
-        <Text style={styles.accountText}>Email account</Text>
+        <Text style={styles.accountText}>Account</Text>
       </Pressable>
     </ScrollView>
   </SafeAreaView>;

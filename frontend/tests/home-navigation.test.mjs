@@ -64,7 +64,7 @@ test('rapid activations before a render open once; returning focus permits a new
   h.controls[0].onPress();
   assert.deepEqual(h.pushes, ['/offline', '/offline']);
 });
-test('Email account entry shares the rapid-tap latch with measurement navigation', () => {
+test('Account entry shares the rapid-tap latch with measurement navigation', () => {
   const h = home();
   h.controls[1].onPress(); h.controls[1].onPress(); h.controls[0].onPress();
   assert.deepEqual(h.pushes, ['/account']);
@@ -87,7 +87,7 @@ test('Home states local storage, transitional History and scientific limits with
   assert.match(h.html, /not clinically validated/);
   assert.match(h.html, /does not provide a diagnosis or treatment guidance/);
   assert.doesNotMatch(h.html, /gait score|health score|fall.risk|patient|signed in|sign in|login|create account|profile|settings/i);
-  assert.equal(h.controls[1].accessibilityLabel, 'Email account');
+  assert.equal(h.controls[1].accessibilityLabel, 'Account');
   h.controls[1].onPress();
   assert.deepEqual(h.pushes, ['/account']);
   assert.doesNotMatch(source('src/home/HomeScreen.tsx'), /OfflineCapture|CameraView|Pose\.|@\/components\/ui|WebApp|firebase|authenticate|loggedIn/);
@@ -136,6 +136,7 @@ test('/offline keeps one real capture, and Home exit dismisses/replaces instead 
   const Route = component('src/app/offline.android.tsx', {
     'expo-router': { useRouter: () => ({ dismissTo: href => calls.push(href) }) },
     '@/offline/OfflineCapture': { default: Capture }, '@/home/MeasurementWorkspaceHeader': { MeasurementWorkspaceHeader: Header },
+    '@/navigation/NavigationSettlement': { useNavigationSettlement: () => ({ canStart: () => true }) },
   }).default;
   const tree = Route();
   assert.equal(tree.type, Capture);

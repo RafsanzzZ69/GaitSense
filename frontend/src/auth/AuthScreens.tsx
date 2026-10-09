@@ -42,7 +42,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     router.replace(verification ? authRoutes.verification : '/');
   };
   useEffect(() => {
-    if ((mode === 'register' || mode === 'login') && auth.session.status === 'SIGNED_IN' && !auth.busy && !navigated.current) {
+    if ((mode === 'register' || mode === 'login' || mode === 'reset') && auth.session.status === 'SIGNED_IN' && !auth.busy && !navigated.current) {
       navigated.current = true;
       leaveForms(mode === 'register' && !auth.session.user.emailVerified);
     }
@@ -83,7 +83,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
         <Text accessibilityRole="header" style={styles.title}>{heading}</Text>
         <Text style={styles.body}>Your account identifies the app user. Measurements remain on this phone and are shared across accounts on this device.</Text>
         {auth.session.status === 'RESTORING' && <View accessibilityLiveRegion="polite"><ActivityIndicator accessibilityLabel="Restoring account" /><Text style={styles.body}>Restoring your account…</Text></View>}
-        {auth.session.status === 'ERROR' && <View><Text accessibilityRole="alert" style={styles.body}>Account access could not initialize. Local measurements are still available.</Text><Button title="Retry account access" onPress={auth.retry} /></View>}
+        {auth.session.status === 'ERROR' && <View><Text accessibilityRole="alert" style={styles.body}>Account access could not initialize. Your local measurements have not been deleted.</Text><Button title="Retry account access" onPress={auth.retry} /></View>}
         {mode === 'welcome' && (auth.session.status === 'SIGNED_IN' ? <>
           <Text style={styles.body}>An account is signed in on this phone.</Text>
           {!auth.session.user.emailVerified && <Button title="Email verification" onPress={() => router.push(authRoutes.verification)} disabled={blocked} />}
@@ -92,7 +92,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           <Button title="Sign in with email" onPress={() => router.push(authRoutes.login)} disabled={blocked} />
           <Button title="Create account" onPress={() => router.push(authRoutes.register)} disabled={blocked} secondary />
         </>)}
-        {(mode === 'register' || mode === 'login' || mode === 'reset') && <>
+        {(mode === 'register' || mode === 'login' || mode === 'reset') && auth.session.status !== 'SIGNED_IN' && <>
           {field('Email', email, setEmail, 'email')}
           {mode !== 'reset' && <>
             {field('Password', password, setPassword, 'password')}
@@ -113,8 +113,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
         {message !== '' && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.message}>{message}</Text>}
         {auth.busy && <ActivityIndicator accessibilityLabel="Account operation in progress" />}
         {mode !== 'welcome' && <Button title="Back to account welcome" onPress={() => router.dismissTo(authRoutes.welcome)} secondary />}
-        {(mode !== 'verification' || auth.session.status !== 'SIGNED_IN') && <Button title="Return to Home" onPress={() => leaveForms()} secondary />}
-        <Text style={styles.caption}>Email account operations need internet. During this transition, Home and local measurement remain available without signing in. App entry protection comes in a later checkpoint. Non-diagnostic; scientific status: not evaluated.</Text>
+        <Text style={styles.caption}>Sign in requires internet. After your saved sign-in is restored, local measurements work offline. Email verification does not block local gait measurement. Non-diagnostic; scientific status: not evaluated.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   </SafeAreaView>;

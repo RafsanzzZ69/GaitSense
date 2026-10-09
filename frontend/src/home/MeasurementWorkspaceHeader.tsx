@@ -4,9 +4,9 @@ import { useCallback, useRef } from 'react';
 import { Alert, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/constants/theme';
 
-type Props = { canLeave: () => boolean; idle: boolean; onHome: () => void };
+type Props = { canLeave: () => boolean; idle: boolean; onHome: () => void; pendingDeparture?: boolean };
 
-export function MeasurementWorkspaceHeader({ canLeave, idle, onHome }: Props) {
+export function MeasurementWorkspaceHeader({ canLeave, idle, onHome, pendingDeparture = false }: Props) {
   const navigation = useNavigation();
   const exiting = useRef(false);
   const explainBlockedExit = () => Alert.alert('Finish this recording first',
@@ -37,6 +37,7 @@ export function MeasurementWorkspaceHeader({ canLeave, idle, onHome }: Props) {
     <View style={styles.copy}>
       <Text accessibilityRole="header" style={styles.title}>Gait Measurement</Text>
       <Text style={styles.subtitle}>{idle ? 'Recording and saved measurements' : 'Finish or discard this attempt to return Home'}</Text>
+      {pendingDeparture && <Text accessibilityRole="alert" style={styles.subtitle}>Account access changed. Finish or cancel this attempt, then discard any retained video. You will return to account access after cleanup. New recordings are blocked.</Text>}
     </View>
     <Pressable accessibilityRole="button" accessibilityLabel="Return to Home"
       accessibilityState={{ disabled: !idle }} disabled={!idle} onPress={requestHome}

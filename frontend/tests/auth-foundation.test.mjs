@@ -195,8 +195,9 @@ test('provider mounts one controller subscription, preserves children and unsubs
 test('native root wraps stable shell once, and web root never imports native auth', () => {
   const root = read('src/app/_layout.android.tsx');
   assert.equal((root.match(/<AuthProvider>/g) || []).length, 1);
-  assert.match(root, /dangerouslySingular.*gaitsense-measurement/);
-  assert.doesNotMatch(root, /Redirect|useAuth|uid|Protected|OfflineCapture/);
+  assert.match(root, /<AndroidAuthGate\s*\/>/);
+  assert.doesNotMatch(root, /Redirect|useAuth|uid|OfflineCapture|key=/);
+  assert.match(read('src/auth/AndroidAuthGate.tsx'), /dangerouslySingular.*gaitsense-measurement/);
   assert.doesNotMatch(read('src/app/_layout.web.tsx'), /AuthProvider|firebase/);
   assert.doesNotMatch(read('src/auth/firebase-auth-adapter.ts'), /from.*firebase/);
 });

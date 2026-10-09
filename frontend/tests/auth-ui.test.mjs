@@ -68,16 +68,19 @@ test('Welcome exposes real email actions and no Google/demo/medical claims', () 
   h.button('Sign in with email').onPress(); h.button('Create account').onPress();
   assert.deepEqual(h.navigations, [['push', '/account/sign-in'], ['push', '/account/create']]);
   assert.match(h.text(), /shared across accounts on this device/);
-  assert.match(h.text(), /without signing in/);
+  assert.match(h.text(), /Sign in requires internet/);
+  assert.match(h.text(), /saved sign-in is restored.*work offline/);
+  assert.doesNotMatch(h.text(), /without signing in|later checkpoint/);
   assert.doesNotMatch(h.text(), /Google|demo account|health score|fall risk|validated medical/i);
 });
-test('restoring/error states affect only account controls; Home exit remains available', () => {
+test('restoring/error account controls cannot bypass protected app entry', () => {
   const h = screen('welcome', { status: 'RESTORING' });
   assert.equal(h.button('Sign in with email').disabled, true);
-  assert.equal(h.button('Return to Home').disabled, false);
+  assert.equal(h.nodes.some(n => n.props?.accessibilityLabel === 'Return to Home'), false);
   const e = screen('welcome', { status: 'ERROR' });
   e.button('Retry account access').onPress(); assert.deepEqual(e.operations, [['retry']]);
-  assert.match(e.text(), /Local measurements are still available/);
+  assert.match(e.text(), /local measurements have not been deleted/);
+  assert.equal(e.nodes.some(n => n.props?.accessibilityLabel === 'Return to Home'), false);
 });
 test('form fields support autofill, obscured passwords, paste and accessible show/hide', () => {
   const h = screen('register');
@@ -142,6 +145,15 @@ test('resend is explicit; verified status appears only from provider snapshot', 
   h.render(); assert.doesNotMatch(h.text(), /Firebase reports that your email is verified/);
   h.auth.session.user.emailVerified = true; h.render(); assert.match(h.text(), /Firebase reports that your email is verified/);
 });
+
+for (const mode of ['login', 'register', 'reset']) {
+  test(`already signed in: ${mode} has no parallel credential form and replaces toward app`, () => {
+    const h = screen(mode, { signedIn: true }); h.render();
+    assert.equal(h.nodes.some(node => node.type === 'TextInput'), false);
+    assert.deepEqual(h.operations, []);
+    assert.deepEqual(h.navigations, [['dismissAll'], ['replace', mode === 'register' ? '/account/verification' : '/']]);
+  });
+}
 test('auth route variants are real Android screens and safe generic redirects; legacy routes remain transitional', () => {
   for (const [name, mode] of [['index', 'welcome'], ['sign-in', 'login'], ['create', 'register'], ['reset', 'reset'], ['verification', 'verification']]) {
     assert.match(read(`src/app/account/${name}.android.tsx`), new RegExp(`AuthScreen mode='${mode}'`));
