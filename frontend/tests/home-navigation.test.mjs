@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { gate } from './helpers/entry-gate-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -41,7 +42,7 @@ function home({ failPush = false } = {}) {
   return { html, controls, pushes, refocus: () => focus[0]() };
 }
 
-test('Android index renders real Home and the primary accessible action opens /offline', () => {
+test('Android index renders real Home and the primary accessible action opens Setup', () => {
   const h = home();
   assert.equal(component('src/app/index.android.tsx', { '@/home/HomeScreen': { default: 'real-home' } }).default, 'real-home');
   assert.match(h.html, /GaitSense/);
@@ -53,29 +54,29 @@ test('Android index renders real Home and the primary accessible action opens /o
   assert.equal(button.disabled, false);
   assert.ok(button.style({ pressed: false })[0].minHeight >= 48);
   button.onPress();
-  assert.deepEqual(h.pushes, ['/offline']);
+  assert.deepEqual(h.pushes, ['/measurement/setup']);
 });
 
 test('rapid activations before a render open once; returning focus permits a new measurement', () => {
   const h = home();
   for (let i = 0; i < 20; i++) h.controls[0].onPress();
-  assert.deepEqual(h.pushes, ['/offline']);
+  assert.deepEqual(h.pushes, ['/measurement/setup']);
   h.refocus();
   h.controls[0].onPress();
-  assert.deepEqual(h.pushes, ['/offline', '/offline']);
+  assert.deepEqual(h.pushes, ['/measurement/setup', '/measurement/setup']);
 });
 test('Account entry shares the rapid-tap latch with measurement navigation', () => {
   const h = home();
   h.controls[1].onPress(); h.controls[1].onPress(); h.controls[0].onPress();
   assert.deepEqual(h.pushes, ['/account']);
-  h.refocus(); h.controls[0].onPress(); assert.deepEqual(h.pushes, ['/account', '/offline']);
+  h.refocus(); h.controls[0].onPress(); assert.deepEqual(h.pushes, ['/account', '/measurement/setup']);
 });
 
 test('synchronous navigation failure releases the tap latch for retry', () => {
   const h = home({ failPush: true });
   assert.throws(() => h.controls[0].onPress(), /synthetic route failure/);
   h.controls[0].onPress();
-  assert.deepEqual(h.pushes, ['/offline']);
+  assert.deepEqual(h.pushes, ['/measurement/setup']);
 });
 
 test('Home states local storage, transitional History and scientific limits without fake accounts or scores', () => {
@@ -105,47 +106,44 @@ function layout(os) {
 }
 
 test('Android root configures a constant workspace identity and existing Router reuses its route key', () => {
-  const { route } = layout('android');
-  assert.equal(route.name, 'offline');
+  const route = gate('SIGNED_IN').tree().props.children.flatMap(group=>React.Children.toArray(group.props.children)).find(node=>node.props.name==='measurement').props;
+  assert.equal(route.name, 'measurement');
   assert.equal(typeof route.dangerouslySingular, 'function');
   const id = route.dangerouslySingular;
-  assert.equal(id('offline', {}), id('offline', { arbitrary: 'deep-link-query' }));
+  assert.equal(id('measurement', {}), id('measurement', { arbitrary: 'deep-link-query' }));
   // Exercise the installed Router's actual underlying stack implementation,
   // rather than a test-owned array simulating navigation. Native transitions
   // and Expo's href dispatcher remain a physical acceptance requirement.
   const { StackRouter } = require('expo-router/build/react-navigation/routers/StackRouter');
   const router = StackRouter({ initialRouteName: 'index' });
-  const options = { routeNames: ['index', 'offline'], routeParamList: {}, routeGetIdList: {
-    offline: ({ params }) => id('offline', params ?? {}),
+  const options = { routeNames: ['index', 'measurement'], routeParamList: {}, routeGetIdList: {
+    measurement: ({ params }) => id('measurement', params ?? {}),
   } };
   let state = router.getInitialState(options);
-  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'offline' } }, options);
+  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'measurement' } }, options);
   const key = state.routes.at(-1).key;
   for (let i = 0; i < 20; i++) {
-    state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'offline', params: { attempt: i } } }, options);
-    assert.equal(state.routes.filter(r => r.name === 'offline').length, 1);
+    state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'measurement', params: { attempt: i } } }, options);
+    assert.equal(state.routes.filter(r => r.name === 'measurement').length, 1);
     assert.equal(state.routes.at(-1).key, key);
   }
-  assert.deepEqual(state.routes.map(r => r.name), ['index', 'offline']);
+  assert.deepEqual(state.routes.map(r => r.name), ['index', 'measurement']);
   assert.equal(layout('ios').route.dangerouslySingular, undefined);
 });
 
-test('/offline keeps one real capture, and Home exit dismisses/replaces instead of pushing', () => {
-  const calls = [];
-  const Capture = () => null, Header = () => null;
-  const Route = component('src/app/offline.android.tsx', {
-    'expo-router': { useRouter: () => ({ dismissTo: href => calls.push(href) }) },
-    '@/offline/OfflineCapture': { default: Capture }, '@/home/MeasurementWorkspaceHeader': { MeasurementWorkspaceHeader: Header },
-    '@/navigation/NavigationSettlement': { useNavigationSettlement: () => ({ canStart: () => true }) },
+test('/offline remains a compatibility redirect and scoped layout owns one capture', () => {
+  const Capture = () => null, Flow = () => null, Redirect = () => null;
+  const Alias = component('src/app/offline.android.tsx', { 'expo-router': { Redirect } }).default;
+  assert.equal(Alias().props.href, '/measurement/setup');
+  const boundary = { canStart: () => true };
+  const Layout = component('src/app/measurement/_layout.android.tsx', {
+    '@/offline/OfflineCapture': { default: Capture }, '@/measurement/MeasurementFlow': { MeasurementFlow: Flow },
+    '@/navigation/NavigationSettlement': { useNavigationSettlement: () => boundary },
   }).default;
-  const tree = Route();
-  assert.equal(tree.type, Capture);
-  const access = { canLeave: () => true, idle: true };
-  const header = tree.props.renderWorkspaceHeader(access);
-  assert.equal(header.type, Header);
-  assert.equal(header.props.canLeave, access.canLeave);
-  header.props.onHome();
-  assert.deepEqual(calls, ['/']);
+  const tree = Layout(); assert.equal(tree.type, Capture); assert.equal(tree.props.navigationBoundary, boundary);
+  const access = { canLeave: () => true };
+  assert.equal(tree.props.renderMeasurement(access).type, Flow);
+  assert.equal(tree.props.renderMeasurement(access).props.access, access);
   assert.equal(component('src/app/offline.tsx', { '@/offline/OfflineCapture': { default: Capture } }).default, Capture);
 });
 

@@ -55,15 +55,27 @@ export function checkAndroidRoutes(read) {
     routerHooks.includes(node.initializer.expression.text)).map(node => node.name.text);
   assert.ok(nodes(home, node => ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
     ts.isIdentifier(node.expression.expression) && routers.includes(node.expression.expression.text) &&
-    node.expression.name.text === 'push' && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === '/offline').length,
-  'Home must enter /offline through Expo Router');
+    node.expression.name.text === 'push' && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === '/measurement/setup').length,
+  'Home must enter /measurement/setup through Expo Router');
   const forbiddenHomeImports = home.statements.filter(ts.isImportDeclaration).filter(node =>
     /^(expo-camera|expo-video)$|OfflineCapture|gaitsense-pose/.test(node.moduleSpecifier.text));
   assert.equal(forbiddenHomeImports.length, 0, 'Home must not own camera or measurement implementation');
 
-  const workspace = parse(read, 'src/app/offline.android.tsx');
+  const workspace = parse(read, 'src/app/measurement/_layout.android.tsx');
   assert.equal(jsxOpenings(workspace, imports(workspace, '@/offline/OfflineCapture')).length, 1,
-    '/offline must mount exactly one existing OfflineCapture');
+    'Measurement layout must mount exactly one existing OfflineCapture');
+  assert.equal(jsxOpenings(workspace, imports(workspace, '@/measurement/MeasurementFlow', 'MeasurementFlow')).length, 1,
+    'Measurement layout must use the professional presentation');
+  for (const page of ['setup','camera','processing','results','history']) {
+    const marker=parse(read, `src/app/measurement/${page}.tsx`);
+    assert.equal(marker.statements.filter(ts.isImportDeclaration).length, 0, 'Child routes must not own another controller');
+  }
+  const alias=parse(read, 'src/app/offline.android.tsx');
+  const forwards=jsxOpenings(alias,imports(alias,'expo-router','Redirect'));
+  assert.equal(forwards.length,1,'Android /offline must be a compatibility redirect');
+  assert.ok(forwards[0].attributes.properties.some(attribute=>ts.isJsxAttribute(attribute) &&
+    attribute.name.text==='href' && attribute.initializer && ts.isStringLiteral(attribute.initializer) &&
+    attribute.initializer.text==='/measurement/setup'), 'Android /offline must redirect to /measurement/setup');
   assert.ok(exposesDefault(parse(read, 'src/app/offline.tsx'), '@/offline/OfflineCapture'),
     'Generic /offline must retain OfflineCapture');
   for (const route of ['assess','dashboard','history','profile','login','register','report/[id]']) {

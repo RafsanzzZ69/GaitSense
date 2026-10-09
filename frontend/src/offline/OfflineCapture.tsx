@@ -13,7 +13,8 @@ import { createSavedAnalysisBinding } from './saved-analysis-binding';
 import type { SavedAnalysisPresentation } from './analysis-presentation';
 import { SavedAnalysisPanel } from './SavedAnalysisPanel';
 import { RecordingAnalysisSetupControls } from './RecordingAnalysisSetupControls';
-import { createRecordingSetupBinding, serializeRecordingSetup } from './recording-analysis-setup';
+import { createRecordingSetupBinding, serializeRecordingSetup, snapshotRecordingSetup } from './recording-analysis-setup';
+import type { MeasurementAccess } from '../measurement/measurement-access';
 import type { DepartureBoundary } from '../navigation/departure-boundary';
 
 function Preview({ uri, size }: {uri: string; size: {width:number; height:number}}) {
@@ -23,9 +24,10 @@ function Preview({ uri, size }: {uri: string; size: {width:number; height:number
 function Action({label,onPress,disabled=false,accessibilityLabel=label,selected}: {label:string; onPress:()=>void; disabled?:boolean; accessibilityLabel?:string; selected?:boolean}) {
   return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{disabled,selected}} disabled={disabled} onPress={onPress} style={[styles.button,disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
 }
-export default function OfflineCapture({ renderWorkspaceHeader, navigationBoundary }: {
+export default function OfflineCapture({ renderWorkspaceHeader, navigationBoundary, renderMeasurement }: {
   renderWorkspaceHeader?: (access: { canLeave: () => boolean; idle: boolean }) => ReactNode;
   navigationBoundary?: DepartureBoundary;
+  renderMeasurement?: (access: MeasurementAccess) => ReactNode;
 } = {}) {
   const window = useWindowDimensions();
   const previewSize = cameraPreviewSize(window.width, window.height);
@@ -63,6 +65,7 @@ export default function OfflineCapture({ renderWorkspaceHeader, navigationBounda
   const locked = useRef(false);
   const uriRef = useRef<string|null>(null);
   const phaseRef = useRef<CapturePhase>('ready');
+  const [completed,setCompleted] = useState<Session|null>(null);
   phaseRef.current = phase;
   const canLeave = useCallback(() => mounted.current && phaseRef.current === 'ready' && !locked.current && !uriRef.current && !recordingSetup.current.get(), []);
   useEffect(() => navigationBoundary?.register(canLeave), [navigationBoundary, canLeave]);
@@ -110,7 +113,8 @@ export default function OfflineCapture({ renderWorkspaceHeader, navigationBounda
   };
   const record=async()=>{
     if(!canRecord(phase,consent,ready,!!Pose) || locked.current || navigationBoundary?.canStart() === false) return;
-    locked.current=true; interrupted.current=false; setError(''); setPhase('countdown');
+    locked.current=true; interrupted.current=false; setError(''); setCompleted(null); setPhase('countdown');
+    if(renderMeasurement) analysisBinding.current?.clear();
     try {
       recordingSetup.current.start(view,direction,upright);
       for(let i=3;i>0;i--) {
@@ -130,6 +134,7 @@ export default function OfflineCapture({ renderWorkspaceHeader, navigationBounda
     if(!Pose || !canProcess(phase,uri,consent) || locked.current) return;
     locked.current=true; interrupted.current=false; setError(''); setProgress(0); setFrames([]); setPhase('processing');
     const source=uri!;
+    let saved:Session|null=null;
     try {
       const setup=recordingSetup.current.get();
       if(!setup) throw new Error('Recording setup snapshot is unavailable. Discard and retake.');
@@ -138,6 +143,7 @@ export default function OfflineCapture({ renderWorkspaceHeader, navigationBounda
       const stored=parseFrames(await Pose.readFrames(result.id));
       if(mounted.current){setFrames(stored);setFrameIndex(0);}
       await refresh();
+      saved=result;
     } catch(e) { reportError(e); }
     finally {
       // A failed/cancelled attempt is not silently retained as a retry video.
@@ -146,14 +152,66 @@ export default function OfflineCapture({ renderWorkspaceHeader, navigationBounda
       if(!uriRef.current) resetSetup();
       locked.current=false;
       if(mounted.current){setReady(false);setPhase(uriRef.current?'preview':'ready');}
+      // Publish only after the existing save/readback/cleanup has settled.
+      if(mounted.current && saved && !uriRef.current && renderMeasurement) {
+        setCompleted(saved);
+        void analysisBinding.current?.select(saved.id);
+      }
       navigationBoundary?.changed();
     }
   };
   const removeSession=(id:string)=>Alert.alert('Delete local session?','This permanently removes its stored landmarks from this phone.',[
-    {text:'Cancel',style:'cancel'}, {text:'Delete',style:'destructive',onPress:()=>void (async()=>{analysisBinding.current?.clear();await Pose!.deleteSession(id);setFrames([]);await refresh();})().catch(reportError)}
+    {text:'Cancel',style:'cancel'}, {text:'Delete',style:'destructive',onPress:()=>void (async()=>{analysisBinding.current?.clear();await Pose!.deleteSession(id);if(completed?.id===id)setCompleted(null);setFrames([]);await refresh();})().catch(reportError)}
   ]);
   const active=phase==='countdown'||phase==='recording'||phase==='processing';
   const frame=frames[frameIndex];
+  const canContinue = () => {
+    if(!canLeave() || !consent || !Pose || navigationBoundary?.canStart() === false) return false;
+    try {snapshotRecordingSetup(view,direction,upright); return true;} catch {return false;}
+  };
+  const setupContent = <>      <View style={styles.notice}><Text style={styles.heading}>Local-processing notice</Text><Text style={styles.text}>Only record yourself or an informed, consenting adult. Video and 33-point landmarks are processed on this phone. The temporary video is deleted after processing or discard; landmarks stay on this phone until you delete them. Gait data is not uploaded. App access requires an account. This notice is not research-study consent.</Text>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{checked:consent,disabled:active||!!uri}} disabled={active||!!uri} onPress={()=>setConsent(!consent)} style={styles.choice}><Text style={styles.text}>{consent?'☑':'☐'} I understand and agree to local processing.</Text></Pressable>
+      </View>
+      <Text style={styles.heading}>Setup</Text><Text style={styles.text}>Use a steady phone, clear level path and even light. Keep one person's entire body visible from the side. Walk comfortably; stop if uncomfortable. Record 10–15 seconds. A three-second countdown precedes recording.</Text>
+      <Text accessibilityRole="header" style={styles.heading}>Which side of the person is facing the camera?</Text>
+      <Text style={styles.text}>Use the person's own left or right side, not the left or right of the image. This is separate from which way they walk.</Text>
+      <View style={styles.row}>{(['side_left','side_right'] as SideView[]).map(side=>{const label=side==='side_left'?'Left side of the person':'Right side of the person';return <Action key={side} label={view===side?`✓ ${label}`:label} accessibilityLabel={label} selected={view===side} disabled={active||!!uri} onPress={()=>setView(side)}/>;})}</View>
+      <RecordingAnalysisSetupControls direction={direction} upright={upright} disabled={active||!!uri} onDirection={setDirection} onUpright={setUpright}/>
+</>;
+  const cameraContent = <>      {!permission?.granted ? <Action label="Allow camera (no microphone)" onPress={()=>void requestPermission().catch(reportError)}/> : <>
+        {phase!=='processing' && phase!=='preview' && <CameraView key={cameraKey} ref={camera} style={[styles.camera,previewSize]} ratio="16:9" facing="back" mode="video" mute videoQuality="720p" onCameraReady={()=>setReady(true)} onMountError={e=>{setReady(false);setError(e.message);}}/>}
+        <Text style={styles.text}>Hold upright. Keep head and feet inside the live image throughout the walk; leave space around the body. Preview {previewSize.width} × {previewSize.height} layout points; capture requests 720p. Black bars are outside the image.</Text>
+        {phase==='ready' && <><Text style={styles.text}>{ready?'Camera initialized. Confirm the live image is visible before recording.':'Waiting for camera…'}</Text><Action label="Restart camera preview" onPress={()=>{setReady(false);setError('');setCameraKey(k=>k+1);}}/></>}
+        {phase==='ready' && <Action label="Record 15-second video" disabled={!canRecord(phase,consent,ready,!!Pose) || navigationBoundary?.canStart() === false} onPress={()=>void record()}/>}
+        {phase==='countdown' && <><Text accessibilityLiveRegion="polite" style={styles.heading}>Starting in {countdown}…</Text><Action label="Cancel countdown" onPress={()=>{interrupted.current=true;}}/></>}
+        {phase==='recording' && <><Text style={styles.heading}>Recording {seconds}s / 15s</Text><Action label="Stop recording" onPress={()=>camera.current?.stopRecording()}/></>}
+
+      </>}
+</>;
+  const previewContent = <>{uri && phase==='preview' && <><Preview uri={uri} size={previewSize}/>        {phase==='preview' && <><Action label="Extract landmarks on this phone" disabled={!consent} onPress={()=>void process()}/><Action label="Discard video / retake" onPress={()=>void discard()}/></>}</>}</>;
+  const processingContent = <>      {phase==='processing' && <View style={styles.notice}><Text accessibilityLiveRegion="polite" style={styles.heading}>Extracting landmarks… {progress}%</Text><Text style={styles.text}>Keep the app open. This uses the bundled model, not a server.</Text><Action label="Cancel processing" onPress={()=>Pose?.cancel()}/></View>}
+</>;
+  const technicalContent = <>{renderMeasurement && sessions.filter(s=>s.id===analysis?.selection.sessionId).map(s=>s.diagnostics && <Text key={s.id} selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>)}      {!!error && <Text accessibilityRole="alert" selectable style={styles.error}>{error}</Text>}
+      {!!frames.length && <View style={styles.notice}><Text style={styles.heading}>Saved landmark inspection</Text><Text style={styles.text}>{frames.length} pose frames · frame {frameIndex+1} · {frame?.timestampMs} ms</Text><View style={styles.plot}>{frame?.landmarks.filter(p=>p.visibility>=.6&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1).map(p=><View key={p.index} style={[styles.dot,{left:`${p.x*100}%`,top:`${p.y*100}%`}]}/>)}</View><View style={styles.row}><Action label="Previous frame" disabled={frameIndex===0} onPress={()=>setFrameIndex(i=>i-1)}/><Action label="Next frame" disabled={frameIndex===frames.length-1} onPress={()=>setFrameIndex(i=>i+1)}/></View><Text style={styles.text}>Normalized landmark preview only. Not a calibrated skeleton or gait measurement.</Text></View>}
+      {analysis && analysis.status!=='unselected' && <SavedAnalysisPanel presentation={analysis} onClear={()=>analysisBinding.current?.clear()}/>}
+</>;
+  const historyContent = <>      <Text style={styles.heading}>On-device history ({sessions.length}, latest 100)</Text>
+      <Text style={styles.text}>If the app was force-closed during recording, a temporary camera video may remain. Clear leftovers below before lending or sharing this phone.</Text>
+      <Action label="Clear leftover temporary camera videos" disabled={active||!!uri} onPress={()=>Alert.alert('Clear temporary recordings?','Deletes camera-cache videos from this app only, including interrupted recordings. Saved landmarks are kept.',[{text:'Cancel',style:'cancel'},{text:'Clear',style:'destructive',onPress:()=>void Pose!.clearTemporaryVideos().then(()=>setError('Temporary camera videos cleared.')).catch(reportError)}])}/>
+      {sessions.length===0 && <Text style={styles.text}>No saved landmark sessions yet.</Text>}
+      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text>{!renderMeasurement && s.diagnostics && <Text selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>}<Action label="View saved analysis" accessibilityLabel={`View saved analysis for session ${s.id}`} disabled={active} onPress={()=>void analysisBinding.current?.select(s.id)}/><Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
+      {!!sessions.length && <Action label="Delete all local landmark history" disabled={active} onPress={()=>Alert.alert('Delete all local history?','This cannot be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete all',style:'destructive',onPress:()=>void (analysisBinding.current?.clear(),Pose!.deleteAll()).then(()=>{setCompleted(null);setFrames([]);return refresh();}).catch(reportError)}])}/>}</>;
+  if(renderMeasurement) return renderMeasurement({
+    phase,consent,ready,nativeAvailable:!!Pose,view,direction,upright,uri,countdown,seconds,error,
+    completed,analysis,canLeave,selectedSession:sessions.find(s=>s.id===analysis?.selection.sessionId) ?? (completed?.id===analysis?.selection.sessionId?completed:null),
+    canContinue,
+    prepareCamera:()=>{setReady(false);setError('');},
+    canRecord:canRecord(phase,consent,ready,!!Pose) && navigationBoundary?.canStart() !== false,
+    setup:setupContent,camera:cameraContent,preview:previewContent,processing:processingContent,
+    technical:technicalContent,history:historyContent,
+    record:()=>void record(),process:()=>void process(),discard:()=>void discard(),
+    cancelCountdown:()=>{interrupted.current=true;},stop:()=>camera.current?.stopRecording(),
+  });
   return <SafeAreaView style={styles.page}>
     {renderWorkspaceHeader?.({
       canLeave,
@@ -164,33 +222,12 @@ export default function OfflineCapture({ renderWorkspaceHeader, navigationBounda
     <Text style={styles.title}>Record. Extract. Keep it local.</Text>
     <Text style={styles.text}>Engineering prototype, not a health assessment. No gait score or diagnosis is produced. Pose landmarks are estimates.</Text>
     {!Pose ? <View style={styles.notice}><Text style={styles.heading}>Native build required</Text><Text style={styles.text}>Use the GaitSense Android build with its bundled MediaPipe model. Expo Go, iOS and the public website cannot run this prototype. No simulated result will be generated.</Text></View> : <>
-      <View style={styles.notice}><Text style={styles.heading}>Local-processing notice</Text><Text style={styles.text}>Only record yourself or an informed, consenting adult. Video and 33-point landmarks are processed on this phone. The temporary video is deleted after processing or discard; landmarks stay in local SQLite until you delete them. Gait data is not uploaded. App access requires an account. This notice is not research-study consent.</Text>
-        <Pressable accessibilityRole="checkbox" accessibilityState={{checked:consent,disabled:active||!!uri}} disabled={active||!!uri} onPress={()=>setConsent(!consent)} style={styles.choice}><Text style={styles.text}>{consent?'☑':'☐'} I understand and agree to local processing.</Text></Pressable>
-      </View>
-      <Text style={styles.heading}>Setup</Text><Text style={styles.text}>Use a steady phone, clear level path and even light. Keep one person's entire body visible from the side. Walk comfortably; stop if uncomfortable. Record 10–15 seconds. A three-second countdown precedes recording.</Text>
-      <Text accessibilityRole="header" style={styles.heading}>Which side of the person is facing the camera?</Text>
-      <Text style={styles.text}>Use the person's own left or right side, not the left or right of the image. This is separate from which way they walk.</Text>
-      <View style={styles.row}>{(['side_left','side_right'] as SideView[]).map(side=>{const label=side==='side_left'?'Left side of the person':'Right side of the person';return <Action key={side} label={view===side?`✓ ${label}`:label} accessibilityLabel={label} selected={view===side} disabled={active||!!uri} onPress={()=>setView(side)}/>;})}</View>
-      <RecordingAnalysisSetupControls direction={direction} upright={upright} disabled={active||!!uri} onDirection={setDirection} onUpright={setUpright}/>
-      {!permission?.granted ? <Action label="Allow camera (no microphone)" onPress={()=>void requestPermission().catch(reportError)}/> : <>
-        {uri && phase==='preview' ? <Preview uri={uri} size={previewSize}/> : phase!=='processing' && <CameraView key={cameraKey} ref={camera} style={[styles.camera,previewSize]} ratio="16:9" facing="back" mode="video" mute videoQuality="720p" onCameraReady={()=>setReady(true)} onMountError={e=>{setReady(false);setError(e.message);}}/>}
-        <Text style={styles.text}>Hold upright. Keep head and feet inside the live image throughout the walk; leave space around the body. Preview {previewSize.width} × {previewSize.height} layout points; capture requests 720p. Black bars are outside the image.</Text>
-        {phase==='ready' && <><Text style={styles.text}>{ready?'Camera initialized. Confirm the live image is visible before recording.':'Waiting for camera…'}</Text><Action label="Restart camera preview" onPress={()=>{setReady(false);setError('');setCameraKey(k=>k+1);}}/></>}
-        {phase==='ready' && <Action label="Record 15-second video" disabled={!canRecord(phase,consent,ready,!!Pose) || navigationBoundary?.canStart() === false} onPress={()=>void record()}/>}
-        {phase==='countdown' && <><Text accessibilityLiveRegion="polite" style={styles.heading}>Starting in {countdown}…</Text><Action label="Cancel countdown" onPress={()=>{interrupted.current=true;}}/></>}
-        {phase==='recording' && <><Text style={styles.heading}>Recording {seconds}s / 15s</Text><Action label="Stop recording" onPress={()=>camera.current?.stopRecording()}/></>}
-        {phase==='preview' && <><Action label="Extract landmarks on this phone" disabled={!consent} onPress={()=>void process()}/><Action label="Discard video / retake" onPress={()=>void discard()}/></>}
-      </>}
-      {phase==='processing' && <View style={styles.notice}><Text accessibilityLiveRegion="polite" style={styles.heading}>Extracting landmarks… {progress}%</Text><Text style={styles.text}>Keep the app open. This uses the bundled model, not a server.</Text><Action label="Cancel processing" onPress={()=>Pose?.cancel()}/></View>}
-      {!!error && <Text accessibilityRole="alert" selectable style={styles.error}>{error}</Text>}
-      {!!frames.length && <View style={styles.notice}><Text style={styles.heading}>Saved landmark inspection</Text><Text style={styles.text}>{frames.length} pose frames · frame {frameIndex+1} · {frame?.timestampMs} ms</Text><View style={styles.plot}>{frame?.landmarks.filter(p=>p.visibility>=.6&&p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1).map(p=><View key={p.index} style={[styles.dot,{left:`${p.x*100}%`,top:`${p.y*100}%`}]}/>)}</View><View style={styles.row}><Action label="Previous frame" disabled={frameIndex===0} onPress={()=>setFrameIndex(i=>i-1)}/><Action label="Next frame" disabled={frameIndex===frames.length-1} onPress={()=>setFrameIndex(i=>i+1)}/></View><Text style={styles.text}>Normalized landmark preview only. Not a calibrated skeleton or gait measurement.</Text></View>}
-      {analysis && analysis.status!=='unselected' && <SavedAnalysisPanel presentation={analysis} onClear={()=>analysisBinding.current?.clear()}/>}
-      <Text style={styles.heading}>On-device history ({sessions.length}, latest 100)</Text>
-      <Text style={styles.text}>If the app was force-closed during recording, a temporary camera video may remain. Clear leftovers below before lending or sharing this phone.</Text>
-      <Action label="Clear leftover temporary camera videos" disabled={active||!!uri} onPress={()=>Alert.alert('Clear temporary recordings?','Deletes camera-cache videos from this app only, including interrupted recordings. Saved landmarks are kept.',[{text:'Cancel',style:'cancel'},{text:'Clear',style:'destructive',onPress:()=>void Pose!.clearTemporaryVideos().then(()=>setError('Temporary camera videos cleared.')).catch(reportError)}])}/>
-      {sessions.length===0 && <Text style={styles.text}>No saved landmark sessions yet.</Text>}
-      {sessions.map(s=><View key={s.id} style={styles.notice}><Text style={styles.heading}>{new Date(s.createdAt).toLocaleString()}</Text><Text style={styles.text}>{s.poseFrames} frames · {(s.usableFrameRatio*100).toFixed(0)}% usable · {s.view} · raw video deleted</Text>{s.diagnostics && <Text selectable style={styles.text}>Processing diagnostics: {s.diagnostics}</Text>}<Action label="View saved analysis" accessibilityLabel={`View saved analysis for session ${s.id}`} disabled={active} onPress={()=>void analysisBinding.current?.select(s.id)}/><Action label="Read saved landmarks" disabled={active} onPress={()=>void Pose!.readFrames(s.id).then(raw=>{setFrames(parseFrames(raw));setFrameIndex(0);}).catch(reportError)}/><Action label="Delete this session" disabled={active} onPress={()=>removeSession(s.id)}/></View>)}
-      {!!sessions.length && <Action label="Delete all local landmark history" disabled={active} onPress={()=>Alert.alert('Delete all local history?','This cannot be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete all',style:'destructive',onPress:()=>void (analysisBinding.current?.clear(),Pose!.deleteAll()).then(()=>{setFrames([]);return refresh();}).catch(reportError)}])}/>}
+      {setupContent}
+      {cameraContent}
+      {previewContent}
+      {processingContent}
+      {technicalContent}
+      {historyContent}
     </>}
   </ScrollView></SafeAreaView>;
 }

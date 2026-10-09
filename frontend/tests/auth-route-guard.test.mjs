@@ -23,7 +23,7 @@ test('signed-out direct /offline cannot construct a workspace navigation entry',
   const h = gate('SIGNED_OUT'); const { StackRouter } = require('expo-router/build/react-navigation/routers/StackRouter');
   const router = StackRouter({}); const options = { routeNames: h.routes(), routeParamList: {}, routeGetIdList: {} };
   const state = router.getInitialState(options);
-  assert.equal(router.getStateForAction(state, { type: 'PUSH', payload: { name: 'offline' } }, options), null);
+  assert.equal(router.getStateForAction(state, { type: 'PUSH', payload: { name: 'measurement' } }, options), null);
   assert.equal(h.boundary.mustRetain(), false);
 });
 test('online and offline restored signed-in identity use the identical local gate', () => {
@@ -47,22 +47,22 @@ test('idle signed-out change removes protected Home/offline history using instal
   const h = gate('SIGNED_IN'); const { StackRouter } = require('expo-router/build/react-navigation/routers/StackRouter'); const router = StackRouter({});
   let options = { routeNames: h.routes(), routeParamList: {}, routeGetIdList: {}, routeKeyChanges: [] };
   let state = router.getInitialState(options);
-  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'offline' } }, options);
+  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'measurement' } }, options);
   h.auth.session = { status: 'SIGNED_OUT', user: null }; options = { ...options, routeNames: h.routes() };
   state = router.getStateForRouteNamesChange(state, options);
   assert.deepEqual(state.routes.map(route => route.name), ['account']);
   assert.equal(router.getStateForAction(state, { type: 'POP', payload: { count: 1 } }, options), null);
 });
-test('an admitted unsafe owner retains only offline; auth and other routes cannot cover it', () => {
+test('an admitted unsafe owner retains only measurement; auth and other routes cannot cover it', () => {
   const h = gate('SIGNED_IN'); let safe = false; const release = h.boundary.register(() => safe);
   h.auth.session = { status: 'SIGNED_OUT', user: null };
-  assert.deepEqual(h.routes(), ['offline']); assert.equal(h.boundary.canStart(), false);
+  assert.deepEqual(h.routes(), ['measurement']); assert.equal(h.boundary.canStart(), false);
   safe = true; h.boundary.changed(); assert.deepEqual(h.routes(), ['account']); release();
 });
 
 test('pending sign-out retains the unsafe owner while Firebase still reports SIGNED_IN', async () => {
   const h = gate('SIGNED_IN'); let safe = false; h.boundary.register(() => safe);
-  const departure = h.boundary.requestDeparture(); assert.deepEqual(h.routes(), ['offline']);
+  const departure = h.boundary.requestDeparture(); assert.deepEqual(h.routes(), ['measurement']);
   assert.equal(h.auth.session.status, 'SIGNED_IN'); assert.equal(h.boundary.canStart(), false);
   safe = true; h.boundary.changed(); assert.equal(await departure.ready, true);
   assert.deepEqual(h.routes(), ['account']);
@@ -79,12 +79,12 @@ test('pending sign-out prunes covering routes while preserving the admitted work
   const h = gate('SIGNED_IN'); const { StackRouter } = require('expo-router/build/react-navigation/routers/StackRouter');
   const router = StackRouter({}); let options = { routeNames: h.routes(), routeParamList: {}, routeGetIdList: {}, routeKeyChanges: [] };
   let state = router.getInitialState(options);
-  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'offline' } }, options);
+  state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'measurement' } }, options);
   const ownerKey = state.routes.at(-1).key;
   state = router.getStateForAction(state, { type: 'PUSH', payload: { name: 'account' } }, options);
   let safe = false; h.boundary.register(() => safe); const departure = h.boundary.requestDeparture();
   options = { ...options, routeNames: h.routes() }; state = router.getStateForRouteNamesChange(state, options);
-  assert.deepEqual(state.routes.map(route => route.name), ['offline']); assert.equal(state.routes[0].key, ownerKey);
+  assert.deepEqual(state.routes.map(route => route.name), ['measurement']); assert.equal(state.routes[0].key, ownerKey);
   assert.equal(router.getStateForAction(state, { type: 'POP', payload: { count: 1 } }, options), null);
   safe = true; h.boundary.changed(); options = { ...options, routeNames: h.routes() };
   state = router.getStateForRouteNamesChange(state, options); assert.deepEqual(state.routes.map(route => route.name), ['account']);
@@ -93,7 +93,7 @@ test('pending sign-out prunes covering routes while preserving the admitted work
 test('ERROR/restoration during an admitted attempt retains settlement, then closes entry safely', () => {
   for (const status of ['ERROR', 'RESTORING']) {
     const h = gate('SIGNED_IN'); let safe = false; h.boundary.register(() => safe); h.auth.session = { status, user: null };
-    assert.deepEqual(h.routes(), ['offline']); safe = true; h.boundary.changed(); assert.deepEqual(h.routes(), []);
+    assert.deepEqual(h.routes(), ['measurement']); safe = true; h.boundary.changed(); assert.deepEqual(h.routes(), []);
   }
 });
 test('stable session/root route sets do not alternate into redirect loops', () => {

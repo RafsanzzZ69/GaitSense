@@ -36,8 +36,8 @@ test('native preflight accepts actual Phase 1 Home and measurement source', () =
 test('route relationships tolerate formatting, quote and local import alias changes', () => {
   assert.doesNotThrow(() => check({
     'src/app/index.android.tsx': 'import Landing from "@/home/HomeScreen";\nexport default Landing;',
-    'src/home/HomeScreen.tsx': source('src/home/HomeScreen.tsx').replace('useRouter }', 'useRouter as getRouter }').replace('useRouter()', 'getRouter()').replace("router.push('/offline')", 'router . push ( "/offline" )'),
-    'src/app/offline.android.tsx': source('src/app/offline.android.tsx').replaceAll('OfflineCapture', 'Capture').replace('@/offline/Capture', '@/offline/OfflineCapture'),
+    'src/home/HomeScreen.tsx': source('src/home/HomeScreen.tsx').replace('useRouter }', 'useRouter as getRouter }').replace('useRouter()', 'getRouter()').replace("router.push('/measurement/setup')", 'router . push ( "/measurement/setup" )'),
+    'src/app/measurement/_layout.android.tsx': source('src/app/measurement/_layout.android.tsx').replaceAll('OfflineCapture', 'Capture').replace('@/offline/Capture', '@/offline/OfflineCapture'),
     'src/app/dashboard.android.tsx': 'import { Redirect as Forward } from "expo-router"; export default function Legacy() { return <Forward href="/offline" />; }',
   }));
 });
@@ -47,11 +47,11 @@ test('pre-Phase-1 index redirect is rejected rather than required', () => {
 });
 
 test('Home must retain the Expo Router measurement entry', () => {
-  assert.throws(() => check({ 'src/home/HomeScreen.tsx': source('src/home/HomeScreen.tsx').replace("router.push('/offline')", "router.push('/dashboard')") }), /Home must enter \/offline/);
+  assert.throws(() => check({ 'src/home/HomeScreen.tsx': source('src/home/HomeScreen.tsx').replace("router.push('/measurement/setup')", "router.push('/dashboard')") }), /Home must enter \/measurement\/setup/);
 });
 
 test('commented-out navigation is not a measurement entry', () => {
-  assert.throws(() => check({ 'src/home/HomeScreen.tsx': source('src/home/HomeScreen.tsx').replace("router.push('/offline');", "// router.push('/offline');") }), /Home must enter \/offline/);
+  assert.throws(() => check({ 'src/home/HomeScreen.tsx': source('src/home/HomeScreen.tsx').replace("router.push('/measurement/setup');", "// router.push('/measurement/setup');") }), /Home must enter \/measurement\/setup/);
 });
 
 for (const dependency of ['expo-camera', '@/offline/OfflineCapture', '../../modules/gaitsense-pose']) {
@@ -60,12 +60,14 @@ for (const dependency of ['expo-camera', '@/offline/OfflineCapture', '../../modu
   });
 }
 
-test('/offline must render the proven capture implementation', () => {
-  assert.throws(() => check({ 'src/app/offline.android.tsx': source('src/app/offline.android.tsx').replace('@/offline/OfflineCapture', '@/home/HomeScreen') }), /mount exactly one/);
+test('measurement layout must render the proven capture implementation', () => {
+  assert.throws(() => check({ 'src/app/measurement/_layout.android.tsx': source('src/app/measurement/_layout.android.tsx').replace('@/offline/OfflineCapture', '@/home/HomeScreen') }), /mount exactly one/);
 });
-
-test('/offline cannot mount two capture implementations', () => {
-  assert.throws(() => check({ 'src/app/offline.android.tsx': "import Capture from '@/offline/OfflineCapture'; export default function Workspace() { return <><Capture /><Capture /></>; }" }), /mount exactly one/);
+test('measurement layout cannot mount two capture implementations', () => {
+  assert.throws(() => check({ 'src/app/measurement/_layout.android.tsx': "import Capture from '@/offline/OfflineCapture'; export default function Workspace() { return <><Capture /><Capture /></>; }" }), /mount exactly one/);
+});
+test('/offline must preserve its redirect into the one owner', () => {
+  assert.throws(() => check({ 'src/app/offline.android.tsx': source('src/app/offline.android.tsx').replace('/measurement/setup', '/') }), /must redirect to \/measurement\/setup/);
 });
 
 test('generic /offline fallback still exposes OfflineCapture', () => {

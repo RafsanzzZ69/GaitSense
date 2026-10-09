@@ -20,7 +20,7 @@ export default function HomeScreen() {
     opening.current = true;
     setStarting(true);
     try {
-      router.push('/offline');
+      router.push('/measurement/setup');
     } catch (error) {
       opening.current = false;
       setStarting(false);

@@ -38,7 +38,7 @@ test('protected direct offline and legacy routes cannot bypass first-use require
     const h = gate('SIGNED_IN', preferences); assert.equal(h.boundary.canStart(), false);
     if (!h.routes().length) continue;
     const router = StackRouter({}), options = { routeNames: h.routes(), routeParamList: {}, routeGetIdList: {} }, initial = router.getInitialState(options);
-    for (const name of ['offline', ...h.protectedAppRoutes]) assert.equal(router.getStateForAction(initial, { type: 'PUSH', payload: { name } }, options), null);
+    for (const name of ['measurement', 'offline', ...h.protectedAppRoutes]) assert.equal(router.getStateForAction(initial, { type: 'PUSH', payload: { name } }, options), null);
   }
 });
 test('preference failure offers only local retry and does not call auth retry', () => {
@@ -55,7 +55,7 @@ test('stable prerequisite combinations do not alternate into redirect loops', ()
 });
 test('first-use cannot replace an unsafe admitted gait workspace or its sign-out settlement', () => {
   const h = gate('SIGNED_IN', state(1, 1)); let safe = false; h.boundary.register(() => safe);
-  h.preferences.versions = state().versions; assert.deepEqual(h.routes(), ['offline']); assert.equal(h.boundary.canStart(), false);
+  h.preferences.versions = state().versions; assert.deepEqual(h.routes(), ['measurement']); assert.equal(h.boundary.canStart(), false);
   safe = true; h.boundary.changed(); assert.equal(h.routes()[0], 'acknowledgement');
 });
 test('acknowledgement starts unchecked, accessible, and cannot silently accept', async () => {

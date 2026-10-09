@@ -49,7 +49,10 @@ export function AndroidAuthGate() {
         {protectedAppRoutes.map(name => <Stack.Screen key={name} name={name} />)}
       </Stack.Protected>
       <Stack.Protected guard={(ready && !boundary.isPending()) || retaining}>
-        <Stack.Screen name="offline" dangerouslySingular={() => 'gaitsense-measurement'} />
+        <Stack.Screen name="measurement" dangerouslySingular={() => 'gaitsense-measurement'} />
+      </Stack.Protected>
+      <Stack.Protected guard={ready && !boundary.isPending() && !retaining}>
+        <Stack.Screen name="offline" />
       </Stack.Protected>
       <Stack.Protected guard={signedIn && (entry === 'ONBOARDING_REQUIRED' || ready) && !boundary.isPending() && !retaining}>
         <Stack.Screen name="guide" />

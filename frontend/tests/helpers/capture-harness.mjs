@@ -24,14 +24,16 @@ function component(path, replacements) {
   return module.exports;
 }
 
-export function capture(navigationBoundary, localSessions = []) {
+export function capture(navigationBoundary, localSessions = [], { professional = false, initialize = true } = {}) {
   const states = [], refs = [], effects = [], callbacks = [], discarded = [], destroyed = [];
-  let stateIndex = 0, refIndex = 0, effectIndex = 0, callbackIndex = 0, access, clipResolve, processResolve, cleanupFails = false;
-  const camera = { recordAsync: () => new Promise(resolve => { clipResolve = resolve; }), stopRecording() {} };
+  let measurement;
+  const selections=[], processCalls=[], cameraCalls=[];
+  let stateIndex = 0, refIndex = 0, effectIndex = 0, callbackIndex = 0, access, clipResolve, processResolve, processReject, cleanupFails = false;
+  const camera = { recordAsync: options => { cameraCalls.push(options); return new Promise(resolve => { clipResolve = resolve; }); }, stopRecording() {} };
   const pose = { listSessions: async () => JSON.stringify(localSessions), cancel() {}, addListener: () => ({ remove() {} }),
     deleteSession: () => destroyed.push('session'), deleteAll: () => destroyed.push('all'),
     discardVideo: async uri => { discarded.push(uri); if (cleanupFails) throw Error('synthetic cleanup failure'); },
-    processVideoWithSetup: () => new Promise(resolve => { processResolve = resolve; }) };
+    processVideoWithSetup: (...args) => { processCalls.push(args); return new Promise((resolve, reject) => { processResolve = resolve; processReject = reject; }); } };
   const equal = (a, b) => a && b && a.length === b.length && a.every((value, i) => value === b[i]);
   const effect = (fn, deps) => {
     const i = effectIndex++, previous = effects[i];
@@ -51,12 +53,12 @@ export function capture(navigationBoundary, localSessions = []) {
     'expo-router': { useFocusEffect: fn => effect(fn, [fn]) }, 'expo-camera': { useCameraPermissions: () => [{ granted: true }, () => {}], CameraView: () => null },
     'expo-video': { useVideoPlayer: () => null, VideoView: () => null }, 'react-native-safe-area-context': { SafeAreaView: web.View },
     '../../modules/gaitsense-pose': { default: pose }, './contract': contract, './framing': framing, './recording-analysis-setup': setup,
-    './saved-analysis-binding': { createSavedAnalysisBinding: () => ({ dispose() {}, leave() {} }) },
+    './saved-analysis-binding': { createSavedAnalysisBinding: () => ({ dispose() {}, leave() {}, clear() {}, select: async id => selections.push(id) }) },
     './SavedAnalysisPanel': { SavedAnalysisPanel: () => null }, './RecordingAnalysisSetupControls': { RecordingAnalysisSetupControls: () => null },
   }).default;
   let tree;
   function render() { stateIndex = refIndex = effectIndex = callbackIndex = 0;
-    tree = Capture({ navigationBoundary, renderWorkspaceHeader: value => { access = value; return null; } });
+    tree = Capture({ navigationBoundary, renderMeasurement: professional ? value => { measurement=value; access={canLeave:value.canLeave,idle:value.canLeave()}; return React.createElement(React.Fragment,null,value.setup,value.camera,value.preview,value.processing,value.history,value.technical); } : undefined, renderWorkspaceHeader: value => { access = value; return null; } });
     for (const item of effects) if (item.pending) { item.cleanup?.(); item.cleanup = item.fn(); item.pending = false; }
   }
   function find(predicate, node) {
@@ -64,15 +66,19 @@ export function capture(navigationBoundary, localSessions = []) {
     if (React.isValidElement(node)) return predicate(node) ? node : find(predicate, node.props.children);
   }
   render();
-  find(n => typeof n.props.onCameraReady === 'function', tree).props.onCameraReady();
-  find(n => n.props.accessibilityRole === 'checkbox', tree).props.onPress();
+  if(initialize) {
+    find(n => typeof n.props.onCameraReady === 'function', tree).props.onCameraReady();
+    find(n => n.props.accessibilityRole === 'checkbox', tree).props.onPress();
+  }
   render();
-  return { render, canLeave: () => access.canLeave(), idle: () => access.idle,
+  return { render, get access(){return measurement;}, selections, processCalls, cameraCalls, cameraReady:()=>find(n=>typeof n.props.onCameraReady==='function',tree).props.onCameraReady(), consent:()=>find(n=>n.props.accessibilityRole==='checkbox',tree).props.onPress(), canLeave: () => access.canLeave(), idle: () => access.idle,
+    setupControls: () => find(n => typeof n.props.onDirection === 'function', tree).props,
     hasSession: id => !!find(n => n.props.accessibilityLabel === `View saved analysis for session ${id}`, tree),
     press: label => find(n => n.props.label === label, tree).props.onPress(),
     control: label => find(n => n.props.label === label, tree).props,
     resolveClip: () => clipResolve({ uri: 'file:///cache/Camera/synthetic.mp4' }),
     resolveProcessing: (raw = '{}') => processResolve(raw), // Parser rejects: exercises real failure cleanup.
+    rejectProcessing: cause => processReject(cause),
     readFrames: value => { pose.readFrames = value; },
     failCleanup: value => { cleanupFails = value; }, discarded, destroyed,
     unmount: () => effects.forEach(item => item.cleanup?.()) };

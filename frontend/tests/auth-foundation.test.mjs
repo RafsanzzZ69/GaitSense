@@ -204,7 +204,8 @@ test('native root wraps stable shell once, and web root never imports native aut
 test('source security boundaries: no secret persistence, Google, account destruction or gait coupling', () => {
   const authSources = readdirSync(new URL('../src/auth/', import.meta.url)).map(name => read('src/auth/' + name)).join('\n');
   assert.doesNotMatch(authSources, /AsyncStorage|SecureStore|localStorage|JSON\.stringify|console\.|getIdToken|fetch\(|setTimeout|GoogleAuthProvider|deleteUser|linkWithCredential|OfflineCapture|sqlite|MediaPipe|gaitsense-pose/);
-  assert.doesNotMatch(read('src/app/index.android.tsx') + read('src/app/offline.android.tsx'), /useAuth|AuthProvider|Redirect|firebase/);
+  assert.doesNotMatch(read('src/app/index.android.tsx') + read('src/app/offline.android.tsx'), /useAuth|AuthProvider|firebase/);
+  assert.match(read('src/app/offline.android.tsx'), /Redirect href="\/measurement\/setup"/);
   const unchangedPaths = ['modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt', 'modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/RequiredJointQualityGate.kt'];
   for (const path of unchangedPaths) assert.doesNotMatch(read(path), /firebase|Firebase|\bUID\b/);
   assert.match(read('src/auth/auth-controller.ts'), /adapter\.subscribe/);
