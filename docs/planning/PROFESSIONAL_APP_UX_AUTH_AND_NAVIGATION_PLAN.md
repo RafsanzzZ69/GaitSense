@@ -118,6 +118,8 @@ Delete account is online and may need recent provider reauthentication. Confirm 
 
 ### Separate later Firebase implementation task
 
+Phase 2A compatibility, signing, permission and implementation prerequisites are recorded in [Firebase Auth implementation readiness](FIREBASE_AUTH_IMPLEMENTATION_READINESS.md). Its native-library recommendations are conditional build candidates. The pre-auth checkpoint has now corrected the stale native-input Home assertion and verified the current release build; Phase 1 physical acceptance remains pending. No Firebase implementation is included in Phase 2A or the pre-auth checkpoint.
+
 Phase 2 must deliver actual SDK configuration, current Google credential flow, email create/login/reset/verification, local restoration, basic sign-out/delete/linking controls, operation error handling and the controlled internet-permission change. Phase 8 later improves account/settings presentation rather than postponing working account lifecycle.
 
 | Acceptance case | Required result |
@@ -207,7 +209,7 @@ History / local deletion -> existing native SQLite methods
 
 There is no Firebase path from gait controller/storage/analysis. No video, landmarks, session payloads, knee outputs, candidates, intervals, reference labels or participant records upload. Do not add Firebase Storage, Firestore gait collections, automatic exports, Analytics or Crashlytics as an auth dependency. Current research/backend/showcase assets remain separate.
 
-**Initial local ownership decision:** preserve today's device-local database. It is not UID-scoped; signing into another account on the same installation will see the same device History. Authentication identifies the operator/account, not ownership of every saved recording. Clearly say “Measurements on this phone”; disclose retained History when signing out/switching accounts, and offer explicit local deletion. Do not silently assign historical records to the first Firebase account, migrate schema, erase data on logout, or claim account isolation. Protect local routes while signed out; public privacy/local cleanup can be available without exposing result contents.
+**Current local-data boundary — ACCOUNT-SCOPED HISTORY / LOCAL OWNERSHIP: DEFERRED PENDING SUPERVISOR DECISION.** Preserve today's device-local database. It is not UID-scoped; signing into another account on the same installation will see the same device History. Authentication identifies the operator/account, not ownership of every saved recording. Clearly say “Measurements on this phone”; disclose retained History when signing out/switching accounts, and offer explicit local deletion. Do not silently assign historical records to the first Firebase account, migrate schema, erase data on logout, or claim account isolation. Protect local routes while signed out; public privacy/local cleanup can be available without exposing result contents.
 
 This is suitable for the present device-managed research app with explicit shared-device handling, not a promise of private multi-user vaults. If product review requires isolation between accounts, schedule a separate local access/ownership migration with preservation of legacy sessions before shared-device release. It still need not involve cloud sync. Firebase authentication does not independently authenticate frame ownership or establish participant identity.
 
@@ -323,7 +325,7 @@ Keep design tokens modular so Android screen polish does not inadvertently redes
 
 ## 15. Migration phases
 
-### Phase 1 checkpoint — SOURCE COMPLETE / PHYSICAL PENDING
+### Phase 1 checkpoint — SOURCE/BUILD COMPLETE / PHYSICAL PENDING
 
 **PHASE 1 SOURCE IMPLEMENTATION: IMPLEMENTED.** **PHASE 1 PHYSICAL ACCEPTANCE: PENDING.** The professional-app milestone is not complete.
 
@@ -333,7 +335,13 @@ Android index now renders [HomeScreen](../../frontend/src/home/HomeScreen.tsx). 
 
 Home shows GaitSense, “Offline gait analysis using your phone camera,” a guided-recording card, local/no-upload information, and a visible “Scientific status: not evaluated” / non-diagnostic note. History remains inside the existing workspace. Android dashboard, assess, history, login, register, profile and report/[id] remain intentional transitional redirects to `/offline`. Web routes/layout, native gait code, permissions, SQLite schema and scientific modules are unchanged. Device-wide session ownership/account isolation remains a separate pre-multi-account-release decision; no hypothetical UID is assigned.
 
-Source verification: [14 new shell/navigation tests](../../frontend/tests/home-navigation.test.mjs), plus 117 existing recording-analysis-setup/offline/saved-analysis UI/integration tests, passed (131/131 focused); the full frontend suite passed 649/649 with no failures or skips. TypeScript passed. These Node checks use actual production components/handlers with injected UI/native seams and the installed underlying stack router; they do not establish Android hardware transitions, camera behavior or SDK persistence. No APK build, native compilation or physical test was performed. Unrelated work is excluded from the checkpoint and verified against before/after file hashes.
+Initial source verification, before the build checkpoint: [14 new shell/navigation tests](../../frontend/tests/home-navigation.test.mjs), plus 117 existing recording-analysis-setup/offline/saved-analysis UI/integration tests, passed (131/131 focused); the full frontend suite passed 649/649 with no failures or skips. TypeScript passed. These Node checks use actual production components/handlers with injected UI/native seams and the installed underlying stack router; they do not establish Android hardware transitions, camera behavior or SDK persistence. No APK build, native compilation or physical test was performed in that initial source task. Unrelated work is excluded from the checkpoint and verified against before/after file hashes.
+
+**Pre-auth source/build checkpoint (9 October 2026): COMPLETE.** The [native-input checker](../../frontend/scripts/check-offline-native.mjs) now parses the Home -> `/offline` -> single OfflineCapture relationship with the already-installed TypeScript parser; intentional legacy redirects and all existing native/privacy/model gates remain checked. [25 new preflight regression tests](../../frontend/tests/native-input-check.test.mjs) pass; focused tests pass 156/156 and the full frontend suite passes 674/674, with no failures/skips. TypeScript, corrected native preflight and whitespace checks pass.
+
+The established `scripts/android-build.ps1 -Action assemble` workflow succeeded without toolchain, package, signer or native-source changes (`BUILD SUCCESSFUL in 1m 56s`; 544 tasks, 36 executed). The Android bundle was rebuilt. Nonfatal CMake path-length and Gradle deprecation warnings remain; no upgrades were made. APK verification and certificate checks passed: `com.gaitsense.research`, versionName 0.1.0, versionCode 1, minSdk26, targetSdk36, historical signer unchanged; INTERNET/audio/broad storage absent, backup disabled, pinned model and arm64-v8a/x86_64 libraries present, no private/data archive entries detected.
+
+Candidate APK: `output/pre-auth-baseline/gaitsense-pre-auth-home-78bb8320c30516bf03a609751ddf73093776b83f405854ef97bef082f083ad72.apk`, **117,298,039 bytes**, SHA-256 `78bb8320c30516bf03a609751ddf73093776b83f405854ef97bef082f083ad72`. The ignored hash-named copy is frozen for later device acceptance; APK/build artifacts are not committed. **PHASE 1 PHYSICAL ACCEPTANCE: PENDING.** Firebase is not started; account-scoped History remains deferred pending supervisor decision.
 
 Remaining physical acceptance, in a later authorized task: native app Home cold launch; rapid repeated Start; direct `/offline` and legacy entry; idle Home/Back removal; blocked exits during countdown/recording/preview/processing/cleanup failure and return after settlement; one authorized 10–15-second engineering walk with explicit setup; Airplane-mode processing/save/History/saved analysis and close/reopen. Phone + engineering recording required; Firebase/internet/research dataset/supervisor approval are not required for ordinary Phase 1 acceptance. A source checkpoint does not alter the previously accepted binary or replace device evidence.
 

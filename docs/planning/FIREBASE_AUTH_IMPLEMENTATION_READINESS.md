@@ -1,0 +1,376 @@
+# GaitSense Firebase Authentication implementation readiness
+
+Date: 9 October 2026 (Asia/Dhaka). **Phase 2A: READINESS COMPLETE; FIREBASE IMPLEMENTATION NOT STARTED.**
+
+Repository: `RafsanzzZ69/GaitSense`, branch `main`, audit-start committed baseline: `7737a8de933808345d09ad1b253d9436c6e32e57`. This is the existing application, not a new project. [Professional application plan](PROFESSIONAL_APP_UX_AUTH_AND_NAVIGATION_PLAN.md) remains the product architecture. Phase 1 is now **SOURCE/BUILD COMPLETE / PHYSICAL PENDING** after the pre-auth checkpoint below. Scientific status remains **NOT_EVALUATED**.
+
+Recommendation: native React Native Firebase App + Auth, a small separate Expo Android Credential Manager bridge, and local nonsecret preferences. No Firestore, gait upload, or SQLite ownership migration. The stale preflight assertion is **FIXED** and current pre-auth build verification is **COMPLETE**. Firebase integration readiness remains **conditional** on the Phase 1 device baseline and proof of the added native dependency combination.
+
+## 1. Repository and version audit
+
+### Actual installed platform
+
+The [package manifest](../../frontend/package.json), lockfile and installed package manifests agree on the principal versions. Native versions below come from existing generated files and installed version catalogs, not values copied from the product plan.
+
+| Component | Audited value | Evidence / qualification |
+| --- | --- | --- |
+| Expo | 57.0.11; declared `~57.0.11` | Installed `expo/package.json` and lockfile |
+| Expo Router | 57.0.11; declared `~57.0.11` | Existing `expo-router/entry`; preserve Router |
+| React Native | 0.86.2 | Installed package and ReactAndroid version properties |
+| React / React DOM | 19.2.3 | Package manifest; installed React |
+| Expo Modules Core / autolinking | 57.0.10 / 57.0.9 | Installed manifests |
+| Android Gradle plugin (AGP) | 8.12.0 | Installed RN and RN Gradle plugin catalogs; root classpath has no independent explicit version |
+| Gradle wrapper | 9.3.1 | Existing `frontend/android/gradle/wrapper/gradle-wrapper.properties` |
+| Kotlin Gradle plugin | 2.1.20 | RN catalog, Expo plugin build script; no app override |
+| compileSdk / targetSdk | 36 / 36 | Expo version catalog uses RN catalog; existing APK independently reports both 36 |
+| minSdk | 26 | Generated Gradle property, privacy plugin and gait module; existing APK reports 26 |
+| Build tools / NDK | 36.0.0 / 27.1.12297006 | RN catalog inherited by Expo root plugin |
+| Java runtime | Temurin OpenJDK 21.0.12.1+1 LTS | Actual portable JDK inspected with `java -version` |
+| Java build assumptions | Local build helper asks for JDK 21; Expo core uses JVM toolchain 17 | Runtime JDK and compilation/toolchain target are different settings |
+| Node / TypeScript | 24.11.1 / declared `~6.0.3` | Actual Node; package manifest |
+| New Architecture | Enabled | Existing `newArchEnabled=true`, Expo ReactHost, React Native entry point |
+| Hermes | Enabled | `hermesEnabled=true`, app dependency branch for `hermes-android` |
+| Native pose dependency | MediaPipe tasks-vision 0.10.32 | [Gait module Gradle file](../../frontend/modules/gaitsense-pose/android/build.gradle) |
+| Current Android identity | `com.gaitsense.research`; versionName 0.1.0, versionCode 1 | app.json, generated app Gradle and existing APK |
+
+This is an Expo application with local generated native Android projects, an autolinked Kotlin Expo module, and local custom builds. `frontend/android/` is ignored; the tracked source of repeatable native configuration is app.json, config plugins, module Gradle files and build helpers. [android-build.ps1](../../frontend/scripts/android-build.ps1) only runs prebuild when `android/gradlew.bat` is absent. Adding a config plugin therefore does **not** automatically apply it to the already present Android directory through that helper. Later integration needs deliberate generation and inspection. No EAS or Expo Go requirement should be introduced. A standard custom native build can use RN Firebase without installing expo-dev-client just for production.
+
+### Current application and data boundaries
+
+The [root layout](../../frontend/src/app/_layout.tsx) owns a hidden-header Router Stack; Android `/offline` has `dangerouslySingular` identity `gaitsense-measurement`. [Android index](../../frontend/src/app/index.android.tsx) exports the real [Home](../../frontend/src/home/HomeScreen.tsx); its latched Start action pushes `/offline`. [Android measurement route](../../frontend/src/app/offline.android.tsx) mounts exactly one [OfflineCapture](../../frontend/src/offline/OfflineCapture.tsx). The [workspace header](../../frontend/src/home/MeasurementWorkspaceHeader.tsx) uses a live `canLeave()` predicate, hardware Back interception and screen-removal prevention; safe return uses `dismissTo('/')`. Camera, countdown, preview, processing, cleanup, embedded History and saved-result presentation still belong to OfflineCapture. Auth must wrap these boundaries.
+
+The [native module](../../frontend/modules/gaitsense-pose/android/src/main/java/expo/modules/gaitsensepose/GaitSensePoseModule.kt) owns `gaitsense-offline.db`, SQLite schema version 1, `sessions` and `frames`, with no UID field. It processes the bundled model locally on its executor. Its TypeScript facade uses the Expo Modules API; Android app initialization already uses Expo ReactHost/autolinking. No suitable persistent nonsecret onboarding/preferences service, Firebase SDK, Google login SDK, or AsyncStorage is declared in the frontend. Showcase components and web routes are not an authentication implementation.
+
+Preserve the existing scientific contracts: 33 landmarks, selected required-joint visibility/presence thresholds >=0.6 and normalized bounds checks, 70% usable-session gate, `side_left`/`side_right`, direction +1/-1, explicit upright assertion, immutable recording snapshot, native inference geometry, metadata-v2, checked saved continuity and diagnostics. Outputs remain **projected 2D knee flexion**, **candidate ankle-motion extrema** and **candidate-to-candidate temporal intervals**. Android timestamps remain requested sampling timestamps, not established decoded-frame PTS. Authentication changes neither calculations nor scientific status.
+
+### Preserved local work
+
+At audit start the unrelated changes were `docs/CURRENT_STATE.md`, `research/gaitsense_poc/README.md`, `research/gaitsense_poc/scripts/common.py`, untracked `ShortIntervalComponentTest.kt`, `REPRODUCIBILITY.md`, `metadata_io.py`, `validate_metadata.py`, and files under the PoC tests directory. They are not audit output and must remain byte-for-byte unchanged. Phase2A itself authorized no staging, commit or push; the subsequent pre-auth checkpoint authorizes only these planning documents, the checker correction and its focused tests, excluding unrelated work and generated artifacts.
+
+## 2. Recommended Firebase architecture
+
+| Criterion | A: React Native Firebase App + Auth | B: Firebase JS SDK |
+| --- | --- | --- |
+| Identity and persistence | Native Android Firebase SDK owns credentials and durable auth state | SDK can persist on React Native using `initializeAuth` with `getReactNativePersistence(AsyncStorage)`; incorrect setup can leave only memory persistence |
+| Offline restored user | Native user snapshot/auth-state listener; local availability independent of network operations | Also possible with correctly configured persistence; not inherently online-only |
+| Google Credential Manager | Needs a Google credential producer; exchange ID token via RN Firebase GoogleAuthProvider | Also needs native credential producer on Android; browser popup/redirect is not the native solution |
+| Email, linking, delete, reauth | Native supported operations through maintained modular RN Firebase API | Supported JS operations, with RN-specific persistence/provider limitations to test |
+| Expo | Config plugins + rebuilt custom native binary; fits current application | No Firebase-specific native module, but native Google bridge and INTERNET remain necessary |
+| Build/maintenance | Adds native Gradle, Codegen and SDK version surface; maintainers document Expo integration | Less Firebase-native build surface, but a separate JS auth persistence stack alongside existing native app |
+| Testing | Adapter mocks + Auth emulator + actual Android native restoration tests | Adapter mocks + emulator; RN persistence still requires actual device tests |
+| Fit here | Preferred: native session semantics and Android operations with one native Firebase instance | Viable alternative, not selected solely to avoid controlled native integration |
+
+Choose **A**, using only `@react-native-firebase/app` and `@react-native-firebase/auth`. Use modular APIs. No Analytics, Crashlytics, Storage, Firestore, Messaging, Functions, anonymous identity or custom backend in this phase. Isolate platform adapters so existing web showcase behavior does not import native Firebase or silently become a real account portal. Native SDK persistence is the authoritative identity boundary; local preference flags are never authentication evidence. [Expo Firebase integration guide](https://docs.expo.dev/guides/using-firebase/), [RN Firebase installation](https://rnfirebase.io/), [JS SDK persistence API](https://firebase.google.com/docs/reference/js/auth#getreactnativepersistence).
+
+## 3. Compatibility evidence and unresolved items
+
+Evidence was checked on the audit date. Published package contents and registries were read in memory; nothing was installed. Broad peer ranges are necessary constraints, not proof of this exact native build.
+
+| Item | Evidence and candidate | Status for this repository |
+| --- | --- | --- |
+| Expo/RN/React | [SDK 57 reference](https://docs.expo.dev/versions/v57.0.0/) maps SDK 57 to RN 0.86, React 19.2.3, compile/target 36 and Node >=22.13.x | Installed principal versions match |
+| RN Firebase App/Auth | Public npm metadata resolves both latest tags to **26.4.0**; Auth requires App exactly 26.4.0. Expo peer >=47, broad React/RN peers. [App package](https://unpkg.com/@react-native-firebase/app@26.4.0/package.json), [Auth package](https://unpkg.com/@react-native-firebase/auth@26.4.0/package.json) | Recommend exact matching 26.4.0 as the initial build candidate; not a tested production pin |
+| Architecture | [v26 migration](https://rnfirebase.io/migrating-to-v26) requires Codegen TurboModules/New Architecture for native modules | Existing New Architecture satisfies the declared requirement; Codegen/runtime test pending |
+| Android SDK/JDK | App 26.4.0 metadata defaults min 23, compile/target 34; its Gradle script inherits project SDK settings and requires JVM >=17, noting tests on 17/21 | Project 26/36/36 and JDK21 meet these baseline constraints |
+| Google services plugin | RN Firebase 26.4.0 metadata/config-plugin constants select **4.5.0**; [official plugin documentation](https://firebase.google.com/docs/android/google-services-plugin-and-file) also shows 4.5.0 | Candidate supported by published configuration; Gradle9.3.1 interaction untested |
+| Firebase Android BoM | RN Firebase 26.4.0 defaults to **34.18.0** and Auth uses its shared BoM. [Published App Gradle](https://unpkg.com/@react-native-firebase/app@26.4.0/android/build.gradle), [Auth Gradle](https://unpkg.com/@react-native-firebase/auth@26.4.0/android/build.gradle) | Start with the library-managed BoM; no independent Firebase Auth version or second BoM |
+| Different documentation generations | Live RN Firebase docs include v27; public latest tags observed are 26.4.0. Firebase native Google example currently shows BoM35.0.0 | Do not equate moving docs with installed packages or override to35.0.0 by copying an example; recheck before implementation |
+| AGP | [AGP8.12 release notes](https://developer.android.com/build/releases/agp-8-12-0-release-notes) support API36 and require Gradle>=8.13, JDK>=17 | Minimums satisfied; these minimums do not certify all newer Gradle versions |
+| Kotlin/Gradle | [Kotlin support table](https://kotlinlang.org/docs/gradle-configure-project.html) lists KGP2.1.20–2.1.21 fully supported Gradle7.6.3–8.12.1 and AGP7.3.1–8.7.2 | **Existing Gradle9.3.1/AGP8.12.0 exceed that fully supported range.** This is a pre-existing uncertainty, not a demonstrated Firebase failure |
+| Credential Manager | [AndroidX releases](https://developer.android.com/jetpack/androidx/releases/credentials) list stable **1.6.0**; min23. Google ID [release notes](https://developers.google.com/identity/android-credential-manager/releases) list **1.2.1** | Recommend stable1.6.0 for both credentials artifacts + googleid1.2.1 as the bridge build candidate; min26 meets floor |
+| Credential dependency alignment | [googleid1.2.1 POM](https://dl.google.com/dl/android/maven2/com/google/android/libraries/identity/googleid/googleid/1.2.1/googleid-1.2.1.pom) depends on credentials1.6.0; [credentials1.6.0 POM](https://dl.google.com/dl/android/maven2/androidx/credentials/credentials/1.6.0/credentials-1.6.0.pom) references Kotlin2.1.20/coroutines1.9.0 | Better aligned than introducing unrelated newer Kotlin/coroutines defaults; AAR metadata, merged dependency graph and physical runtime remain pending |
+| Local UI preferences | Installed Expo `bundledNativeModules.json` recommends AsyncStorage **2.2.0**; [SDK57 AsyncStorage reference](https://docs.expo.dev/versions/v57.0.0/sdk/async-storage/) describes persistent unencrypted storage | Candidate for nonsecret preference service; not yet installed or tested |
+
+**Compatibility verdict: plausible, not fully certified.** Do not upgrade Expo, RN, Kotlin, AGP, Gradle, Hermes or MediaPipe in the authentication commit to make a candidate compile. The current pre-auth build has now succeeded on the existing toolchain; the next native checkpoint must inspect dependency resolution and add App/Auth alone. If Firebase requires a change, isolate that diagnosis and checkpoint; do not silently expand into a platform migration. No Firebase build, emulator run or Google device login has been performed.
+
+## 4. Google Credential Manager route
+
+Google's current Android/Firebase path is Credential Manager -> Google ID credential -> Firebase GoogleAuthProvider -> real Firebase UID. A Google account picker result alone is not Firebase authentication. [Firebase Google Android guide](https://firebase.google.com/docs/auth/android/google-signin).
+
+| Integration option | Audit finding | Decision |
+| --- | --- | --- |
+| RN Firebase itself | Exchanges provider credentials and owns Firebase user; not a Credential Manager UI wrapper | Use for final identity exchange |
+| Public `@react-native-google-signin/google-signin`16.1.5 | Maintainer identifies the public package as legacy Android Google Sign-In; source imports GoogleSignInClient | Exclude for the requested current Android path |
+| Maintainer's Universal Sign In | Credential Manager implementation; published support covers Expo57/RN0.86 and Kotlin>=2.0.21/compile>=35; paid/private-registry product | Maintained viable option if separately selected/licensed; adds cost/provisioning unnecessary for initial recommendation |
+| `react-native-nitro-google-signin`2.3.0 | Active public Credential Manager/Google ID wrapper; peers RN>=0.76, Nitro>=0.36.0. Published Gradle adds Nitro/C++ generated autolinking, credentials1.6.0, googleid1.2.0, coroutines1.11.0 | Viable candidate, but no exact SDK57/MediaPipe build proof; extra native/toolchain surface outweighs convenience here |
+| Dedicated small Kotlin Expo module | Existing project already uses Expo Modules API. Can use official stable artifacts without Nitro or a paid wrapper | **Recommended**, in a separate auth module, never inside GaitSensePoseModule |
+
+Sources: [Google wrapper installation/compatibility](https://react-native-google-signin.github.io/docs/install), [Nitro maintainer repository](https://github.com/react-native-nitro-google-sign-in/google-signin), [Nitro2.3.0 Gradle](https://unpkg.com/react-native-nitro-google-signin@2.3.0/android/build.gradle), [Expo Modules API](https://docs.expo.dev/modules/overview/). The dedicated bridge reduces dependency breadth but requires maintained lifecycle/cancellation tests; it is not a ready-made audited implementation.
+
+Proposed bridge responsibility: obtain a credential using the foreground Activity and CredentialManager; verify credential type and parse GoogleIdTokenCredential; return the ID token only transiently to the Auth adapter. Adapter calls `GoogleAuthProvider.credential(idToken)` and `signInWithCredential(getAuth(), credential)`. Discard references after the operation; never persist/log the token. Do not create another FirebaseApp, token store or auth controller in Kotlin.
+
+Use the **Web/server OAuth client ID** associated with the Firebase project (`default_web_client_id`), not the Android OAuth client ID. Explicit Continue with Google should use `GetSignInWithGoogleOption`; optional authorized-account bottom sheet uses `GetGoogleIdOption`, with deliberate unfiltered recovery for no authorized credentials. No Google silent sign-in request at ordinary app startup: restore Firebase locally instead. Support cancellation, no credential, unavailable/outdated Play Services, wrong client/signing identity, malformed credential, Activity destruction, duplicate invocation, network loss, and SDK exchange failure. Do not request Drive scopes, access tokens or server auth codes for simple identity. On intentional sign-out use Credential Manager `clearCredentialState` where supported; do not promise global Google logout. [Google button option](https://developers.google.com/identity/android-credential-manager/android/reference/com/google/android/libraries/identity/googleid/GetSignInWithGoogleOption), [Android Sign in with Google guidance](https://developer.android.com/identity/sign-in/credential-manager-siwg).
+
+## 5. Persistent and offline login contract
+
+1. A single Android AuthProvider subscribes once to native `onAuthStateChanged(getAuth(), ...)`. Begin in AUTH_RESTORING; do not interpret an early unresolved snapshot as signed out.
+2. First resolved user present: SIGNED_IN. Load separate local onboarding/acknowledgement preferences, then Home. Phase2 uses existing Home; Phase3 adds the actual first-use screens.
+3. First resolved user absent: SIGNED_OUT -> Welcome. Local cached UID/name/flags cannot fabricate a Firebase user.
+4. A normal reopening, process restart or reboot uses SDK persistence. Do not impose a calendar login timeout or refresh-token copy. Restoration must work with Airplane mode when the SDK still restores a user.
+5. **No connectivity probe, forced `getIdToken(true)`, `reload(user)`, backend health call, Firestore fetch, or Google credential prompt may gate Home.** SDK background refresh can occur; failure to reach the service is not automatically sign-out.
+6. Keep Home, camera, local MediaPipe processing, SQLite save, embedded History, saved results and local deletion available to the restored user offline. Authentication networking must not be a dependency of those services.
+7. Network-required account operations show their own progress/retry/error. An already signed-in user's failed online operation leaves local access intact unless the SDK actually establishes invalid/signed-out identity.
+8. Verification guidance is a substate of authenticated identity. Cached `emailVerified=false` does not globally lock local gait work. Manual online verification refresh is allowed only as an operation.
+
+[RN Firebase auth persistence/listener documentation](https://rnfirebase.io/auth/usage) supports native persistence. It does not establish a device-specific acceptance result for this app.
+
+Expected exceptions: intentional sign-out; successful account deletion; cleared app storage; uninstall/reinstall without restorable SDK state; SDK credentials invalidated/revoked when learned; password/provider changes affecting credentials; and genuine recent-login/provider reauthentication requirements for sensitive account actions. Cache clearing alone must not be advertised as invariably erasing identity. No promise of eternal login.
+
+**Offline security limitation:** cached native user does not prove that a server-side account is still enabled. A remote deletion/revocation may remain unknown while fully offline; local app access can continue until the SDK learns otherwise. Token expiry and user restoration are different facts. Do not block the device merely because a short-lived ID token cannot refresh offline; do not use the cached UID to authorize any remote service. No backend/admin revocation checker is being added. [Firebase session lifecycle](https://firebase.google.com/docs/auth/admin/manage-sessions), [current-user limitations](https://firebase.google.com/docs/auth/android/manage-users).
+
+Day1 online Google login -> Firebase user stored by SDK. Day30 Airplane-mode launch -> locally restored same user -> Home -> record/process/save/reopen/delete locally. Attempting password reset, provider linking or account deletion then requests connectivity only for that operation. If storage was cleared and no user restores, online authentication is required.
+
+## 6. Route and auth-state design
+
+Keep Expo Router57. Future Android route tree (proposed, not created):
+
+```text
+Android root / stable AuthProvider
+  restoring surface, before auth resolution
+  signed-out auth stack
+    /auth/welcome
+    /auth/sign-in
+    /auth/create-account
+    /auth/reset-password
+  authenticated application
+    /                         existing Home
+    /auth/verification        optional guidance, Continue locally
+    /offline                  single existing measurement workspace
+    /account                  real lifecycle controls, later Settings polish
+  first-use screens (Phase3)
+    acknowledgement / onboarding, driven by local versioned preferences
+```
+
+Guard Home, `/offline`, account operations and every Android legacy alias that can reach the workspace. Auth success removes forms from Back history; restored users skip Welcome. SDK user/state, not stored profile/email, determines route access. Future `/login` and `/register` aliases should reach the real corresponding auth flow when signed out, or Home when signed in. `dashboard`, `assess`, `history`, `profile`, `report/[id]` currently redirect to `/offline`; preserve explicit transitional behavior until genuine destinations replace them, with protection at all entry points. Do not inherit generic showcase login/forms/reports into Android.
+
+Platform-specific root/auth adapters must keep web showcase routes unaffected and avoid native module imports on web. Do not add another root navigation library, tabs with nonexistent destinations, or a second OfflineCapture. Preserve Phase1 Start latch, singular route and direct `/offline` compatibility under its future guard.
+
+**Critical lifecycle design:** [Expo protected routes](https://docs.expo.dev/router/advanced/protected/) can remove active screens and their history when a guard becomes false. Feeding every auth event directly to a root `Stack.Protected` condition can therefore destroy the active controller; ordinary Back prevention alone does not prove safety.
+
+Future guard installation requires a small explicit measurement/auth-transition handshake. Keep the current controller mounted under a stable host while an in-flight attempt settles; subscribe to its live safe-exit condition and use its existing cancel/discard/cleanup paths. User sign-out/delete/link/switch controls are unavailable during countdown, recording, retained preview, processing or cleanup failure. Recheck live refs at activation. Connectivity/token-refresh failure must not trigger guard removal. If authoritative SDK user becomes null or changes unexpectedly, immediately prevent new protected actions and obscure results, cancel/settle the existing attempt through established lifecycle behavior, then remove protected routes after safe cleanup. Retained cleanup failure gets a bounded recovery surface, not forced navigation. A settlement host must not authorize new sessions with a stale identity. Test route removal, listener races and cleanup before enabling the guard; if safe integration cannot be demonstrated, stop that checkpoint for a separately scoped lifecycle integration task.
+
+| State owner | Responsibility |
+| --- | --- |
+| AuthProvider / adapter | SDK subscription, unresolved/null/user distinction, typed identity snapshot; no camera/store ownership |
+| Auth operation coordinator | Single pending login/link/reauth/delete operation, cancellation and late-result generation checks |
+| Preference service | Installation/UID-namespaced acknowledgement and onboarding versions, recoverable nonsecret storage |
+| Router transition coordinator | Entry protection and cleanup settlement; no scientific calculation |
+| OfflineCapture | Immutable recording snapshot, native processing, cleanup and current measurement/session state remain authoritative |
+| Existing saved-analysis bindings/native store | Session reads, continuity checks, analysis and local deletion; no Firebase import |
+
+Initialization error gets Retry/help and no fake identity. Operation errors are separate from session and optional connectivity presentation. No giant global state store; auth snapshot changes must not key/remount OfflineCapture.
+
+## 7. Account operations
+
+Use the pinned RN Firebase modular equivalents of the Firebase native APIs. Operation names below are requirements, not newly implemented calls.
+
+| Operation | Network / Firebase API | Recent authentication | Failure/recovery | Local gait data effect |
+| --- | --- | --- | --- | --- |
+| Google login | Online credential selection/exchange; GoogleAuthProvider + `signInWithCredential` | First login establishes session; later sensitive reauth uses fresh provider credential | Cancel/no credential -> recoverable; configuration, disabled provider, collision, network loss -> bounded error; no synthetic UID | NONE |
+| Email registration | Online; `createUserWithEmailAndPassword`; then `sendEmailVerification` | Creates and signs in real user | Invalid email, weak/password-policy failure, duplicate, rate limit, disabled provider, lost response. Reconcile SDK state before repeating account creation | NONE |
+| Email login | Online; `signInWithEmailAndPassword` | Establishes new/restored session | Wrong password and unknown account get common neutral failure; disabled user/network/rate limit mapped safely | NONE |
+| Password reset | Online; `sendPasswordResetEmail` | No current/recent session needed | Neutral response such as “If an account can receive a reset email, instructions will be sent”; invalid format/retry/rate limit handled | NONE |
+| Email verification | Online send/resend; `sendEmailVerification`; user follows official email action; manual `reload` only when requested | Normally current signed-in user; policy-sensitive operations may need fresh identity | Expired link, send failure, stale flag/resend throttling. Keep authenticated local use available; do not pretend flag refreshed offline | NONE |
+| Sign out | Firebase `signOut` clears local identity; Credential Manager clear state best effort | No recent login; normal Firebase local sign-out must work offline | Block during active measurement; clear identity/results/form caches after settled SDK state. Credential-manager cleanup failure cannot resurrect Firebase user. No auto sign-in afterwards | NONE; retain device History |
+| Delete account | Online; `deleteUser`; on recent-login error, provider-specific `reauthenticateWithCredential` then retry deletion | Required if session insufficiently recent | Cancel/wrong account/offline/recent-login failure leave account intact; lost deletion response needs reconciliation; only confirmed success claims deletion | NONE; retain device History |
+| Link provider | Online; prove current account and new provider credential, then `linkWithCredential` | Request explicit current identity proof; reauth if required by Firebase/security policy | Credential already in use/provider already linked/conflict/network failure -> keep current account. Never sign into another UID as a linking shortcut | NONE; UID must remain same |
+
+Sources: [password authentication and enumeration protection](https://firebase.google.com/docs/auth/android/password-auth), [user management](https://firebase.google.com/docs/auth/android/manage-users), [provider linking](https://firebase.google.com/docs/auth/android/account-linking). Error behavior may differ with email-enumeration protection; do not depend on exposing provider/account existence through discovery APIs. Linking is not automatic account merging. SDKs may apply documented trusted-provider behavior; verify both provider orders and do not promise a specific collision code for every configuration.
+
+## 8. Account and local-data boundary
+
+Firebase stores account identity, basic profile/provider metadata and SDK-managed authentication credentials. App reads UID, optional name/email/photo URL/provider IDs/emailVerified and available account timestamps from the SDK; optional profile edits use Auth updateProfile. No extra profile database is needed for this scope. A remote profile photo must have an initials/local fallback and never gate Home; defer remote image fetching unless intentionally included in the privacy boundary.
+
+Separate local nonsecret preferences hold onboarding completed/skipped/version, acknowledgement version/acceptedAt and UI settings. Namespace by installation and UID; local timestamps are UX records, not research-consent proof. Use a small AsyncStorage adapter with a versioned atomic value and recovery behavior; do not modify gait SQLite for preferences. No password, OAuth credential, refresh token, access token or private admin material goes in that service.
+
+SQLite remains authoritative for all gait sessions, landmarks, metadata/provenance and saved analysis. Raw videos, participant/reference labels, joint series, extrema and intervals never flow into Firebase. Do not attach UID to payloads or introduce cloud telemetry containing scientific/participant data.
+
+**DELETE ACCOUNT** deletes Firebase identity online. **DELETE MEASUREMENTS ON THIS PHONE** is a separate explicit local action, usable offline where existing contracts permit. Account deletion/sign-out must never call deleteAll, deleteSession, erase SQLite, assign old records or clear app storage. Deleting Auth identity does not prove removal of local recordings or provider-side records. No silently queued destructive operation. If optional local cleanup is later offered, report its independent outcome and device-wide scope; it is not part of this implementation audit.
+
+App acknowledgement/privacy text must be revised for Google/Firebase identity networking while stating local gait processing/storage. It is distinct from formal university participant consent; no consent text is fabricated here. Study investigator/withdrawal/retention/participant wording and participant-identity mapping remain supervisor/institution dependent.
+
+**Firestore decision: NO FIRESTORE for Phase2.** Auth profile fields plus local preferences meet current requirements, reduce rules/cost/privacy surface and preserve offline first-use state. Cross-device preferences/profile administration could justify a separately approved minimal profile later; that would need per-UID rules, field allowlists, emulator rules tests and deletion recovery. It must not become gait sync or a startup fetch prerequisite.
+
+## 9. Deferred account-scoped History decision
+
+**ACCOUNT-SCOPED HISTORY / LOCAL OWNERSHIP: DEFERRED PENDING SUPERVISOR DECISION.**
+
+Account A and Account B on the same installation will share the existing device-wide measurement store after signing in. Firebase identity is the app operator, not automatically the walking participant or owner of every recording. Display “Measurements on this phone” and disclose this limitation before multi-account use. Auth UI protection is not UID isolation or database encryption.
+
+Do not add UID columns, migrate/assign old sessions to the first account, erase History at sign-out, fork databases by UID, create Firestore gait records or promise account-private History. An account switch clears visible caches/preferences for the former identity, not native sessions. Supervisor decision is needed before claiming account-scoped privacy or deploying account switching in a participant/shared-device study; this does not prevent controlled engineering auth tests with clearly disclosed device-wide storage.
+
+## 10. Owner Firebase setup checklist
+
+These are manual owner actions, not performed by this audit. No IDs, keys or official configuration have been invented.
+
+1. Create/select an owner-controlled Firebase project on Spark for initial small usage. Record actual project identity privately; decline Analytics and avoid unnecessary service activation/billing upgrades.
+2. Register Android app with exact package **com.gaitsense.research**. Firebase-assigned app ID is separate from Android applicationId; never substitute a made-up value.
+3. Add the verified SHA-1 and SHA-256 below for the actual engineering signer. Register each genuinely used developer signer separately. Future Play App Signing needs the distributed app signing certificate too, not just upload key.
+4. Authentication -> Sign-in method: enable **Google**, select the real support/project email and save. Enable **Email/Password**; do not enable email-link sign-in, anonymous, SMS or other providers accidentally.
+5. Check the associated Google Cloud OAuth Android client package+SHA-1 and the Web/server client used by Credential Manager/Firebase. Confirm credentials belong to the same project. Do not create a custom server or ship a server client secret.
+6. Configure Google Auth Platform branding/audience/contact information. If console status is Testing and test-user restrictions apply, add the actual engineering Google accounts. Basic identity scopes often have verification exceptions; do not assume all projects need full OAuth verification or that Testing permits any account. Confirm the actual console requirement. [Google verification guidance](https://support.google.com/cloud/answer/13463073).
+7. Choose/document an email password policy in Firebase; align UI hints with the server policy. Review email-enumeration protection and use neutral login/reset messages. Approve email templates, sender/project name and support contact.
+8. Use Firebase-hosted reset/verification actions initially. Configure authorized domains/continue URLs only if a later approved action flow actually needs them. Do not revive deprecated Dynamic Links or register a web app merely to obtain the Google server client ID.
+9. After provider/fingerprint setup, download fresh official **google-services.json** for the correct Android app. Deliver/provision the actual file; re-download if OAuth configuration changes. Check package/project and Web-client entry without posting full config in logs.
+10. Review API-key restrictions: keep required Auth APIs (`identitytoolkit.googleapis.com`, `securetoken.googleapis.com`) allowed; do not expose a key for billable unrelated APIs. Test any Android application restriction against actual Firebase native login/reset/refresh flows before enforcing it. Do not use key secrecy as authorization.
+11. Confirm Spark/Identity Platform status and current quotas; use engineering accounts with access to email inboxes and Google provider. No participant accounts/data required for initial acceptance.
+
+[Official Android setup](https://firebase.google.com/docs/android/setup) and [Firebase API key guidance](https://firebase.google.com/docs/projects/api-keys) explain client configuration and restrictions. No owner console access or SDK config was available in this audit.
+
+## 11. Verified signing fingerprints
+
+Read-only `apksigner verify --print-certs` on the existing local release APK succeeded. Safe certificate inspection of `frontend/android/app/debug.keystore` independently returned the same fingerprints. No private key contents or passwords were displayed by the signing commands, and no certificate/keystore was generated or changed.
+
+| Current local variants | Fingerprint safe to register |
+| --- | --- |
+| Release certificate SHA-1 | `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` |
+| Release certificate SHA-256 | `FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C` |
+| Debug certificate SHA-1 | Same as release in this checkout |
+| Debug certificate SHA-256 | Same as release in this checkout |
+
+SHA-256 without colons equals the supplied historical value `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`. The actual SHA-1 without colons is `5e8f16062ea3cd2c4a0d547876baa6f38cabf625`.
+
+**Identity caveat:** generated app Gradle signs both debug and release with `signingConfigs.debug`, whose certificate subject is Android Debug. This is the established local engineering release signer, not evidence of a production private release-key policy. Different machines/regenerated debug keystores can have different fingerprints. Preserve this signer/package for upgrade-compatible engineering tests; never rotate/delete it as part of auth setup. A future production signing/Play distribution decision is separate and must register its actual certificate, preserve upgrade requirements and secure key material. Inspection of an existing APK proves signer/package metadata, not Phase1 physical acceptance or a new auth build.
+
+## 12. google-services configuration handling
+
+google-services.json is **public Firebase Android client configuration**, designed to ship in the app; its Firebase API key/project/app IDs are not service-account private keys or a custom authorization secret. Firebase documentation explicitly describes this distinction. An OAuth Web client ID is also an identifier, not a server client secret. [Firebase project config](https://firebase.google.com/docs/projects/learn-more#config-files-objects).
+
+Recommendation for this private research repo: **locally provision and ignore** `frontend/google-services.json` initially, with a documented owner-download workflow, rather than mixing project-specific configuration into this audit checkpoint. This is environment/provisioning discipline, not a claim that the file cannot safely be committed. Reviewed official client config could later be committed in a private repo if explicitly selected; it would not provide secret-based protection.
+
+Future build workflow: owner provides official file at that stable ignored path; app.json `android.googleServicesFile` points to it; RN Firebase App config plugin copies it into the generated Android app; preflight checks fail clearly if missing, wrong package/project, or missing expected Web OAuth client. CI, if introduced, provisions the same reviewed file from its file/environment mechanism before prebuild. Keep only documented paths/validation in tracked sources. Do not print the whole JSON or generate substitute values. No ignore/config changes or JSON file were made here.
+
+Never commit signing keystores/passwords, service-account/admin JSON/private keys, server OAuth client secrets, credential exports, email passwords, access/refresh/ID tokens or package-registry credentials. Do not label the Android google-services file a service-account file, even where third-party documentation uses loose terminology. SDK/provider libraries own credentials; separate Firebase environments prevent accidental cross-project tests.
+
+## 13. Permission and build changes required later
+
+### Exact INTERNET enforcement
+
+| Location | Current behavior | Later required change |
+| --- | --- | --- |
+| [app.json](../../frontend/app.json) | Loads `withOfflinePrivacy.cjs`; blocks audio/media/storage permissions, not INTERNET directly | Add actual Firebase config/plugin references; retain existing privacy blocks |
+| [withOfflinePrivacy.cjs](../../frontend/plugins/withOfflinePrivacy.cjs) | Generates release-only manifest overlay removing INTERNET and SYSTEM_ALERT_WINDOW; disables backup; enforces min26; refuses overwriting unmarked overlays | Remove only INTERNET removal, preserve marker/merge safeguard, SYSTEM_ALERT_WINDOW removal, backup disabled, SDK floor |
+| Generated Android main/release manifests | Main already requests INTERNET; release overlay removes it. Debug retains networking/cleartext for development | Regenerate/merge release overlay in a controlled task; verify final merged release permits INTERNET and has no release cleartext exception |
+| [check-offline-native.mjs](../../frontend/scripts/check-offline-native.mjs) | Asserts INTERNET removal and privacy/model/module/route inputs | Revise auth-network expectation only with real integration; retain model hash, SDK/audio/backup/overlay protections |
+| [verify-android-apk.ps1](../../frontend/scripts/verify-android-apk.ps1) | Rejects INTERNET in final APK; checks identity/API/camera/no-audio/storage/overlay, bundled JS/model/ABIs, no videos, backup disabled | Require INTERNET for Auth; retain all independent local privacy/model/package checks; add actual signature/auth config verification |
+| [OFFLINE_ANDROID.md](../OFFLINE_ANDROID.md) | Current hardening/manifest checklist says no INTERNET | Version/update current policy to authentication networking plus local gait; keep earlier no-network binary evidence historical |
+| [CURRENT_STATE.md](../CURRENT_STATE.md) | Existing claims about accepted no-INTERNET APK/network absence; unrelated local edits present | Coordinate a later minimal update preserving unrelated work; do not retroactively rewrite historical acceptance |
+
+INTERNET is a normal Android permission, not a runtime user permission dialog. It cannot be restricted by manifest to one module. Adding it permits network traffic for the entire process; “only Auth uses network” must be enforced by module dependency boundaries, code review and traffic tests. Do not promise OS-enforced per-feature isolation. No gait uploader/backend/telemetry is authorized. Audit Expo updates, profile image loading and generic showcase imports too: release currently embeds JS/model and has updates disabled.
+
+### Pre-existing build-input failure — FIXED at pre-auth checkpoint
+
+The Phase2A audit and subsequent pre-auth checkpoint first reproduced **exit1**: the checker still required `index.android.tsx` to contain `Redirect href="/offline"`, while Phase1 correctly exports HomeScreen. The bounded correction now parses the real Home entry, Expo Router `/offline` call, single existing OfflineCapture mount/fallback and seven intentional legacy redirects. All prior native/privacy/model checks remain, including release INTERNET removal. [25 focused checker tests](../../frontend/tests/native-input-check.test.mjs) cover valid source, formatting/import aliases, broken paths/duplicates and retained privacy/model/native gates. The corrected CLI passes on actual generated inputs and bundled model bytes; Home source is unchanged.
+
+**Current pre-auth source/build baseline: COMPLETE (9 October 2026).** [android-build.ps1](../../frontend/scripts/android-build.ps1) `-Action assemble` succeeded on the existing toolchain in 1m56s (544 tasks; 36 executed, 508 up-to-date), rebuilding the Android JavaScript bundle. Focused source tests pass156/156, full frontend674/674, TypeScript and whitespace checks pass. APK verification and signature inspection passed: package `com.gaitsense.research`, version0.1.0/code1, min26/target36; INTERNET/audio/broad storage absent, backup disabled, bundled pinned model and arm64-v8a/x86_64 MediaPipe libraries present. Archive inspection found no private/data entries and confirmed Phase1 Home strings. CMake path-length/Gradle deprecation warnings were nonfatal; no platform upgrade was made. This demonstrates a successful current-source build, not bit-for-bit reproducibility or Firebase compatibility.
+
+Frozen candidate: `output/pre-auth-baseline/gaitsense-pre-auth-home-78bb8320c30516bf03a609751ddf73093776b83f405854ef97bef082f083ad72.apk`; **117,298,039 bytes**; SHA-256 `78bb8320c30516bf03a609751ddf73093776b83f405854ef97bef082f083ad72`. Certificates match section11. APK/build outputs remain ignored and uncommitted. **Phase1 PHYSICAL PENDING; Firebase NOT STARTED; account-scoped History DEFERRED.**
+
+### Native integration surface
+
+Later changes are confined to dependency manifest/lock, app config, RN Firebase config plugins, privacy plugin/preflight/APK checks, generated Google-services root/app Gradle entries/resources, a new independent Google auth Expo module, typed auth adapters/routes/tests and privacy docs. Existing settings autolinking should discover Firebase and the new module; inspect output rather than hand-register duplicate packages. Existing MainApplication/App host normally needs no manual second initialization. No MediaPipe module/executor/schema/calculation change, release identity change, microphone/storage permission, iOS SDK migration or Firebase Admin SDK.
+
+Because Android directories are ignored and already present, preserve/hash relevant generated configuration and signing artifacts first, then apply a reviewed idempotent prebuild/config-plugin change in a later task. Do not blindly follow generic `prebuild --clean` or uninstall instructions: these can lose local native configuration or existing app data. Rebuild with the same package/signer and install as an upgrade for persistence tests. Verify generated and final APK manifests, dependency graph, model hash and ABI libraries at every native checkpoint.
+
+## 14. Future test matrix
+
+Audit results do not count as Auth tests. Use engineering accounts and authorized engineering fixtures; never request participant datasets to validate login.
+
+| Test layer | Required coverage / evidence |
+| --- | --- |
+| Unit/mock | Restore unresolved/null/user/error; offline restored user skips Welcome; no reload/force refresh/probe in startup; first-use preference missing/corrupt/per-UID; login/create validation and duplicate prevention; late success after cancel/exit; neutral unknown/wrong-password/reset errors; verification Later; protected direct/legacy links; no auth Back forms; no token logs; signout/delete/link operation state; account/local deletion separation; active capture listener/guard race and retained cleanup failure |
+| Firebase Auth emulator | Email create/login/wrong password/duplicates, reset/verification action-code behavior, signout, delete/recent-login handling where emulator supports it, linking/provider-conflict scenarios supported by emulator. Read emitted action links through test tooling; deterministic isolated accounts. Production provider/anti-abuse/recent-login differences still need device tests |
+| Real Android online | Correct Firebase UID visible in owner console; email registration, login, wrong/unknown neutral error, reset delivered/consumed, verification delivered/manual refresh; Google success/cancel/no accounts/provider unavailable; interrupted internet; process death during login; both provider link orders and duplicate/collision recovery; fresh/old-session deletion, reauth cancel/failure; signout account picker behavior; unchanged package/signature and upgrade data |
+| Real Android offline restoration | Prior successful real login -> close/reopen, process restart, phone reboot then Airplane-mode launch -> same restored UID/Home. Test multi-day/token-expiry interval without force refresh. Start recording, lose network, process/save; History/saved analysis/local deletion offline; close/reopen retains sessions. Offline signout works; subsequent login requires network; offline delete/link/reset have bounded network-needed state and preserve data |
+| Existing gait regressions | Home/navigation tests; recording-analysis-setup; recording-state/offline; saved-analysis UI/integration/loaders/payload/continuity; TypeScript; diff whitespace. Existing Android instrumentation using already authorized engineering fixtures in the native checkpoint. Preserve thresholds/setup/metadata/native geometry and cleanup assertions |
+| Artifact/privacy | Merged release INTERNET for identity, remaining forbidden permissions absent, backup disabled, embedded JS/model/hash/ABIs, no packaged videos or keys, no gait payload/network upload. Verify credential/token redaction and release emulator endpoint absence |
+
+The [Auth emulator](https://firebase.google.com/docs/emulator-suite/connect_auth) supports useful identity simulations and unsigned emulator tokens; it does **not** prove production Google Credential Manager/OAuth/signing, real email delivery, production rate limits or durable production Android restoration. Use debug-only emulator routing configured before Auth use; never send emulator tokens to production. No Firebase admin service-account key is needed in the mobile app.
+
+Physical acceptance should cover both Google and email-established sessions where practical, at least one accepted engineering walk with explicit side/direction/upright assertions, the70% gate, SQLite History/save/reopen and exact existing scientific labels. On restored offline launch, record identity restoration and local outcomes separately; network failure is not evidence of scientific validity. NOT_EVALUATED remains unchanged.
+
+## 15. Security risks and mitigations
+
+| Risk | Mitigation / acceptance condition |
+| --- | --- |
+| Password/token/credential logging | Typed allowlisted error codes; no raw exception/token/form serialization; redact debug traces; clear transient form/token references after operations |
+| Account enumeration | Neutral unknown/wrong-password/reset responses; enable/review enumeration protection; do not rely on fetchSignInMethodsForEmail for safe collision resolution |
+| Provider collisions / duplicate UIDs | Explicit linking to current user with both identities proven; verify same UID; no email-based merge, auto-delete or provider shortcut |
+| Lost auth response / repeated submission | Single in-flight latch + operation generation; reconcile SDK identity after interrupted create/login/delete; do not repeat a destructive request blindly |
+| Stale UI or identity after signout | SDK event is source of truth; clear rendered/result caches and per-user in-memory preferences; retain native data; disable automatic Google sign-in |
+| Forced-online startup | Tests forbid startup reload/forced token/probe/profile fetch; native restore and local availability stay independent |
+| Signout/delete/auth event during recording | Live lifecycle gate + stable cleanup settlement described in section6; no direct guard-driven unmount or Home push over mounted camera |
+| Deep-link bypass | Cover `/offline`, Home and all Android aliases in route guards; do not rely only on hidden buttons. Client route guards are not backend or OS database security |
+| Credentials/config committed accidentally | Explicit ignored owner provisioning and selective later commits; never admin/signing secrets; review exact diffs, not add-all |
+| Shared-device History mistaken for account privacy | Visible device-wide disclosure; no UID/schema migration until supervisor decision; separate account/local deletion |
+| INTERNET enabling unintended traffic | Native Auth-only deps, no Analytics/cloud gait services, platform import separation and release traffic review; do not loosen other privacy controls |
+| Rooted/compromised device / offline revocation | Describe limits honestly: local SDK/SQLite sandbox and UI protection are not clinical/security certification; revocation learned on future network contact |
+| Signing/project mismatch | Validate package, both fingerprints, Web-client audience and official config; preserve engineering signer, no key rotation in Auth commit |
+| Email verification treated as participant consent | Separate identity verification, app acknowledgement and approved study consent; cached flag never becomes a diagnostic/research authorization claim |
+
+## 16. Safest phased implementation sequence
+
+Each row is a later bounded checkpoint, not authorization to execute it now. No stage/commit/push in2A. Authentication integration commits should be independently reviewable, with existing gait tests mandatory throughout.
+
+| Checkpoint | Scope / exit criterion | Risk | Requirements |
+| --- | --- | --- | --- |
+| 2A (this task) | Source/official compatibility audit, signing readout, readiness docs; no implementation | Low, read-only engineering inspection | No phone/video/dataset/supervisor needed; internet for authoritative guidance |
+| Pre-auth baseline checkpoint | Checker correction and current-source release build/verification COMPLETE; preserve Phase1. Physical acceptance remains pending and separate | Medium; physical baseline gap remains, stale preflight fixed | Phone + one engineering walk for physical acceptance; dependency internet if uncached; no Firebase/dataset/study approval |
+| 2B owner setup | Console project/providers/certificates/OAuth/email policy + official config provisioning. Verify package/client identity and Spark status | Low-medium; configuration errors affect login | Owner console access, internet, engineering Google/email accounts; no video/dataset |
+| 2C native Firebase base | Pin matching App/Auth candidate; reproducible config-plugin setup; coordinated INTERNET/check/doc change. No route gate yet. Build/resolution/Codegen/runtime smoke and no gait regression | High; isolate SDK + Google services + permission checkpoint | Project/config, internet for deps; phone + existing engineering fixture for offline regression. No research dataset/supervisor |
+| 2D email operations | Typed adapter/provider and real Welcome/create/sign-in surfaces. Local validation, operation latches, safe errors and SDK-driven success; no fake identity. Not a releasable partial auth milestone | Medium | Configured Email provider, internet/inboxes, mocks/emulator/phone |
+| 2E restore/protect | One local native auth subscription; protected Android Home/offline/aliases; stable capture-settlement handshake; cache cleanup; no startup network gate. Prove online login -> offline relaunch before expanding | High for routing/lifecycle | Phone; online initial login then Airplane mode; engineering walk; no dataset |
+| 2F Google | Independent Expo Credential Manager bridge and exact candidate resolution; cancellation/Activity tests; Web-client audience + Firebase exchange; actual UID confirmed | High native/provider integration; separate from MediaPipe | Google-configured project, internet, actual Google account/Play Services phone; no participant recordings |
+| 2G reset/verification | Firebase-hosted email actions, resend throttling, manual online refresh, local Continue policy | Medium | Internet, real email inbox, emulator + phone; no video |
+| 2H lifecycle/linking | Real signout/delete/reauth/link controls with idle gate, both link orders/collisions, separate local-data actions/disclosure. No schema ownership work | Medium-high account/race risk | Project/internet/phone/accounts; no research dataset or consent text |
+| 2I acceptance | Full online/offline/restoration/reboot/lifecycle/upgrade/privacy matrix and mandatory gait regressions; record evidence and limitations | High acceptance importance | Phone + authorized engineering walk, internet for online tests/project; no participant dataset/study consent |
+
+### Build-risk classification
+
+JS adapter is medium (state/errors/security); Expo guards are high where they touch active capture; local preference adapter is low-medium; Firebase native dependencies/Codegen and Google services plugin are high integration risk given the unresolved toolchain; INTERNET change is medium implementation/high privacy-review importance; Credential Manager bridge is high lifecycle/provider risk. Existing MediaPipe module remains untouched, but dependency/ABI/model packaging regressions need high-priority checks. Package/signing changes are out of scope and high risk if proposed. Verification script changes are medium and need explicit tests so network permission changes do not weaken unrelated protections.
+
+Native dependency integration, restoring route protection, Google bridge and final physical acceptance deserve separate checkpoints. Reset/verification/lifecycle can be developed incrementally, but the major Phase2 milestone is incomplete until all promised account operations and offline acceptance work. Later Profile/Settings polish is not a reason to defer functional signout/deletion indefinitely.
+
+## 17. Rollback strategy
+
+Retain the known pre-auth source checkpoint **7737a8de933808345d09ad1b253d9436c6e32e57** and preserve the current established signer and previously accepted engineering artifacts securely outside Git. That source has Phase1 physical acceptance pending and the stale preflight issue above; it is not a newly accepted binary.
+
+Isolate each auth checkpoint from gait/research work. If an integration fails, stop and inspect the failed checkpoint/dependency graph. Use an authorized targeted revert of the offending committed auth checkpoint, or a separate checkout/worktree at the known source for comparison; preserve unrelated local changes and ignored native/signing files first. Never reset-hard/clean/prune, uninstall or clear app data to conceal a persistence failure. Reversing native generated configuration requires deliberate plugin regeneration/review, not copying arbitrary old files over local work.
+
+No database migration means rollback needs no ownership/schema downgrade. Do not assume installing an older app version is an acceptable data-preserving rollback on every device; use same-package/same-signer authorized upgrade-compatible builds and verify retained History. Re-run required gait/source/native/privacy checks before claiming recovery. A failing auth build is not justification to rewrite MediaPipe or calculations.
+
+## 18. Cost boundary
+
+For the initial small engineering/thesis population, Google federated and email/password Auth are expected to fit normal no-cost Firebase capabilities on Spark. RN Firebase and the proposed Expo bridge do not require a paid wrapper/service. This is an expectation subject to project tier, usage/abuse and current quotas, not unlimited/free-forever assurance. [Firebase pricing](https://firebase.google.com/pricing).
+
+[Auth limits](https://firebase.google.com/docs/auth/limits) currently include account-creation100/hour/IP, Spark verification-email1000/day and reset-email150/day; Identity Platform on instrumentless Spark has Tier1 daily-user limits. If Identity Platform is enabled, current pricing shows a50K monthly-user no-cost tier with paid usage beyond the applicable tier on billing-enabled plans. Confirm actual Console product/tier rather than combining different daily/monthly limits into one promise. Monitor quota/rate-limit errors and avoid automated live-account test floods.
+
+Later cost sources include SMS, paid Google wrapper licensing, Identity Platform beyond allowances, Functions, Firestore, video/cloud Storage, unrelated APIs, hosted compute, CI/EAS services or custom email infrastructure. None is required or enabled here. Use emulator tests and controlled engineering accounts; do not add paid services to solve a client routing/persistence issue.
+
+## 19. Exact implementation prerequisites and audit verification
+
+Before native implementation, obtain the owner-selected actual Firebase project and official Android google-services.json, enabled Google and Email/Password providers, verified fingerprints/client identity, support email/OAuth audience and engineering test-account availability. No owner/admin password or service-account key should be supplied to the mobile repository. User choices still needed are owner project selection, actual Console policy/configuration and provisioned official file; the architecture recommendation itself needs no fake placeholders.
+
+The stale source-input checker is fixed and current-source pre-auth build verification is complete. Lock Firebase candidate versions only after the isolated native integration checkpoint; handle any new toolchain mismatch separately. Preserve package/signer/data before generation or installation. Confirm a USB-accessible Android phone with Google Play Services, online access for first authentication/email/provider tests and Airplane mode for restoration, and an authorized engineering walking test. SDK package download internet is separate from offline runtime functionality.
+
+**Can work proceed before Phase1 physical acceptance?** Owner Console preparation, documentation, adapter design/tests and isolated compatibility investigation can proceed. The safest sequence completes Phase1 build/checker correction and physical baseline **before merging/enabling Firebase native changes or auth route gates on the primary device**. There is no technical requirement that Firebase waits for Phase1 acceptance, but combining two physically unaccepted changes makes regressions harder to attribute. Neither this audit nor prior source tests establish physical acceptance.
+
+| Requirement | Phase2 implementation/acceptance |
+| --- | --- |
+| Android phone | Required for native/Google/online/offline/reboot acceptance; not for initial docs/mock tests/Console setup |
+| Engineering video | Existing authorized engineering fixture or one normal walking recording for gait regression; not for email forms/Console setup |
+| Firebase project | Actual owner-controlled project/config required for native real-auth setup and live acceptance; mocks/emulator alone do not complete Auth |
+| Internet | Required for project setup/dependency download/first login/reset/verify/link/delete; returning restored local gait use must work without it |
+| Research dataset | NOT required; no participant recordings, labels or model training |
+| Supervisor approval | NOT required for ordinary engineering Auth integration. Required for resolving account-scoped History/study deployment and formal participant-consent/privacy/retention decisions where applicable |
+
+Historical Phase2A audit verification record (before the pre-auth build checkpoint):
+
+- Only this new readiness document and a minimal cross-reference/deferred-ownership clarification in the professional plan are intended task edits. Phase1 status and source remain unchanged.
+- Read-only APK certificate/package inspection succeeded; existing local debug certificate matches the release signer. Existing APK inspection is not a build or device test.
+- Native-input checker was deliberately audited and **failed exit1 on the stale index redirect assertion**; documented in section13, unchanged. No Firebase emulator/auth acceptance tests were run; they would require implementation.
+- `git diff --check` passed; only LF/CRLF conversion warnings were emitted. Separate checks of the untracked readiness file and tracked plan found no trailing whitespace and all **55 relative Markdown links** resolved (18 readiness, 37 plan); all 19 required readiness sections are present.
+- SHA-256 comparison of **346 pre-existing tracked/nonignored files** found only the authorized professional-plan change; all other 345 were unchanged. Separate hashes of **10 ignored native configuration/signing/APK files** were unchanged. The readiness file was the only addition. Git index remained empty and HEAD/local origin/main remained the baseline above.
+- No Firebase packages installed; no Android/native/build/permission/SQLite/gait logic changed; no google-services.json created; no auth routes/code, Firestore, uploads or fake identity implemented; no APK built; no physical testing/data collection/training; no stage/commit/push.
+
+The result is an implementation plan with explicit unresolved build and physical evidence, not permission to weaken offline gait contracts or claim clinical/scientific validation.
