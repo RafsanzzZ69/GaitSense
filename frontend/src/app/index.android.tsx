@@ -1,2 +1,1 @@
-import { Redirect } from 'expo-router';
-export default function AndroidHome() { return <Redirect href="/offline"/>; }
+export { default } from '@/home/HomeScreen';

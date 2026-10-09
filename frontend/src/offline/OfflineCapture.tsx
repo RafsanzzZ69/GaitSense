@@ -1,6 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +22,9 @@ function Preview({ uri, size }: {uri: string; size: {width:number; height:number
 function Action({label,onPress,disabled=false,accessibilityLabel=label,selected}: {label:string; onPress:()=>void; disabled?:boolean; accessibilityLabel?:string; selected?:boolean}) {
   return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{disabled,selected}} disabled={disabled} onPress={onPress} style={[styles.button,disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
 }
-export default function OfflineCapture() {
+export default function OfflineCapture({ renderWorkspaceHeader }: {
+  renderWorkspaceHeader?: (access: { canLeave: () => boolean; idle: boolean }) => ReactNode;
+} = {}) {
   const window = useWindowDimensions();
   const previewSize = cameraPreviewSize(window.width, window.height);
   const [cameraKey,setCameraKey] = useState(0);
@@ -145,7 +148,12 @@ export default function OfflineCapture() {
   ]);
   const active=phase==='countdown'||phase==='recording'||phase==='processing';
   const frame=frames[frameIndex];
-  return <SafeAreaView style={styles.page}><ScrollView removeClippedSubviews={false} contentContainerStyle={styles.content}>
+  return <SafeAreaView style={styles.page}>
+    {renderWorkspaceHeader?.({
+      canLeave: () => mounted.current && phaseRef.current === 'ready' && !locked.current && !uriRef.current && !recordingSetup.current.get(),
+      idle: phase === 'ready' && !uri && !recordingSetup.current.get(),
+    })}
+    <ScrollView removeClippedSubviews={false} contentContainerStyle={styles.content}>
     <Text style={styles.kicker}>GAITSENSE · OFFLINE ANDROID PROTOTYPE</Text>
     <Text style={styles.title}>Record. Extract. Keep it local.</Text>
     <Text style={styles.text}>Engineering prototype, not a health assessment. No gait score or diagnosis is produced. Pose landmarks are estimates.</Text>
